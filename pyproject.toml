@@ -1,0 +1,73 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ai-reliability"
+version = "0.1.0"
+description = "Deterministic, offline-first reliability evaluator for LLM and RAG systems."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+dependencies = [
+    "pydantic>=2.7,<3",
+    "jsonschema>=4.21,<5",
+    "python-dotenv>=1.0,<2",
+]
+
+[project.optional-dependencies]
+# Only extras whose features are implemented in this build are declared.
+# [ui], [live] and [compare] belong to phases 6-8 (see README roadmap).
+dev = [
+    "pytest>=8,<10",
+    "pytest-cov>=5,<8",
+    "ruff>=0.17,<0.18",
+    "mypy>=1.10,<3",
+    "types-jsonschema>=4.21",
+]
+
+[project.scripts]
+ai-reliability = "reliability.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["reliability*", "rag_app*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "BLE", "SIM", "RUF", "PL"]
+ignore = [
+    "PLR0911", # many return statements are clearer than nested branches in verdict code
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+    "PLR2004", # thresholds in tests and metrics are explicit numbers
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S603", "PLC0415"]  # asserts; synthetic secrets are test data; subprocess CLI tests; local imports
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+files = ["reliability"]  # rag_app is added in phase 5
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+
+[tool.coverage.run]
+branch = true
+source = ["reliability", "rag_app"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

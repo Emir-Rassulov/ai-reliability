@@ -1,0 +1,43 @@
+# Default configuration. A file passed with --config is deep-merged over this one.
+# Environment overrides: AIREL_COST_MODE, AIREL_MAX_COST_USD, AIREL_REQUEST_TIMEOUT_S, AIREL_MAX_RETRIES.
+
+[scoring.weights]
+critical = 10
+high = 5
+medium = 2
+low = 1
+
+[release]
+min_pass_rate = 0.90          # PASS / (PASS + FAIL) over gate checks
+max_error_rate = 0.05         # ERROR / applicable gate checks
+max_inconclusive_rate = 0.10  # INCONCLUSIVE / applicable gate checks
+# max_p95_latency_ms = 2000   # optional rule 5; disabled when absent
+
+[retrieval]
+k = 3
+min_precision_at_k = 0.0
+min_recall_at_k = 1.0
+min_mrr = 0.5
+min_context_recall = 1.0
+
+[checks]
+strip_code_fences = false
+citation_pattern = '\[(?P<id>[A-Za-z0-9][A-Za-z0-9._:-]*)\]'
+negation_window = 3
+response_excerpt_chars = 300
+
+[limits]
+max_scenario_file_bytes = 2000000
+max_document_chars = 20000
+max_message_chars = 8000
+max_response_chars = 8000
+request_timeout_s = 30.0
+max_retries = 3
+backoff_base_s = 0.5
+backoff_max_s = 8.0
+max_retry_after_s = 30.0
+
+[cost]
+cost_mode = "zero"
+# max_cost_usd = 1.00
+# pricing_file = "config/pricing.toml"

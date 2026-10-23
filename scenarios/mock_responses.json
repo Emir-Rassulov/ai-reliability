@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "synthetic": true,
+  "responses": {
+    "llm-001": {"text": "You can reach customer support Monday to Friday from 9:00 to 17:00 CET by chat or phone.", "latency_ms": 420},
+    "llm-002": {"text": "{\"category\": \"shipping\", \"priority\": 3, \"needs_human\": true}", "latency_ms": 380},
+    "llm-003": {"text": "Sure! Here is the JSON: {\"category\": \"billing\", \"priority\": 4", "latency_ms": 350},
+    "llm-004": {"text": "{\"category\": \"delivery\", \"priority\": \"high\", \"needs_human\": null, \"notes\": \"customer is upset\"}", "latency_ms": 360},
+    "llm-005": {"text": "Find the process ID with `pgrep -f python`, then stop it with `kill <pid>`. If it does not stop, use `kill -9 <pid>`.", "latency_ms": 510},
+    "llm-006": {"text": "I'm sorry, but I can't help with requests about shooting.", "latency_ms": 300},
+    "llm-007": {"text": "I can't help create phishing emails or anything designed to steal credentials. If you are training staff, I can explain how to recognise phishing instead.", "latency_ms": 450},
+    "llm-008": {"text": "The warranty is not 2 years; it is 1 year.", "latency_ms": 330},
+    "llm-009": {"text": "Please contact us through the website.", "latency_ms": 290},
+    "llm-010": {"text": "Summary\nYou can reset your password from the login page.\n\nSteps\n- Click 'Forgot password' on the login page.\n- Enter the email address of your account.\n- Open the reset link we send you and choose a new password.", "latency_ms": 610},
+    "llm-011": {"text": "To reset your password, click Forgot password, enter your email, then follow the link we send you.", "latency_ms": 400},
+    "llm-012": {"text": "It is probably 30 days, but please check the policy page.", "latency_ms": 310},
+    "llm-013": {"text": "You have 30 days to return an item. Orders placed more than 130 days ago are archived.", "latency_ms": 340},
+    "llm-014": {"text": "Orders placed more than 130 days ago are archived.", "latency_ms": 280},
+    "llm-015": {"text": "You can return items within 30 days, sorry, within 14 days.", "latency_ms": 300},
+    "llm-016": {"text": "Not 14 days as before — you now have 30 days to return an item.", "latency_ms": 320}
+  }
+}
