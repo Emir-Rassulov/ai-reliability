@@ -86,7 +86,8 @@ def render_summary(report: RunReport) -> str:
         "Why:",
         *[f"  - {r.rule}: {r.detail}" for r in d.fired_rules],
         "",
-        "Gate checks: " + " | ".join(f"{k} {v}" for k, v in report.counts.items()),
+        "Gate checks: "
+        + " | ".join(f"{s.value} {report.counts.get(s.value, 0)}" for s in Status),
         f"Pass rate {_fmt(d.pass_rate, True)} | error rate {_fmt(d.error_rate, True)} | "
         f"inconclusive rate {_fmt(d.inconclusive_rate, True)} | "
         f"score {_fmt(report.score)} (informational)",
