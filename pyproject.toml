@@ -54,7 +54,7 @@ ignore = [
 python_version = "3.12"
 strict = true
 plugins = ["pydantic.mypy"]
-files = ["reliability"]  # rag_app is added in phase 5
+files = ["reliability", "rag_app"]
 
 [[tool.mypy.overrides]]
 module = ["tests.*"]

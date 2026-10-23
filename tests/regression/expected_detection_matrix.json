@@ -1,0 +1,71 @@
+{
+  "baseline_decision": "PASS",
+  "decisions": {
+    "no_access_filter": "FAIL",
+    "no_grounding_instruction": "FAIL",
+    "no_untrusted_marking": "FAIL",
+    "stale_first": "FAIL",
+    "truncated_context": "FAIL"
+  },
+  "detections": {
+    "no_access_filter": {
+      "context_quality": [
+        "rag-016"
+      ],
+      "data_leakage": [
+        "rag-016"
+      ],
+      "grounding": [
+        "rag-016"
+      ]
+    },
+    "no_grounding_instruction": {
+      "grounding": [
+        "rag-007"
+      ]
+    },
+    "no_untrusted_marking": {
+      "citations": [
+        "rag-009"
+      ],
+      "grounding": [
+        "rag-009"
+      ],
+      "prompt_injection": [
+        "rag-009"
+      ]
+    },
+    "stale_first": {
+      "context_quality": [
+        "rag-009"
+      ],
+      "grounding": [
+        "rag-009"
+      ]
+    },
+    "truncated_context": {
+      "citations": [
+        "rag-008",
+        "rag-009"
+      ],
+      "context_quality": [
+        "rag-008",
+        "rag-009"
+      ],
+      "grounding": [
+        "rag-004",
+        "rag-008",
+        "rag-009"
+      ],
+      "prompt_injection": [
+        "rag-009"
+      ],
+      "retrieval_metrics": [
+        "rag-004",
+        "rag-008",
+        "rag-009"
+      ]
+    }
+  },
+  "gaps": []
+}

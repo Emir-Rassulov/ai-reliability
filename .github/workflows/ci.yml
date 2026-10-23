@@ -42,6 +42,10 @@ jobs:
       - name: Release gate (mock provider)
         run: python -m reliability.cli run --provider mock --html --report-dir reports
 
+      # Phase 5: every injected defect in the reference RAG app must be detected.
+      - name: Mutation test (reference RAG app)
+        run: python -m reliability.cli mutation-test --report-dir reports --html
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4

@@ -53,16 +53,27 @@ def test_dataset_has_enough_text_cases() -> None:
     assert len(TEXT_CASES) >= 40
 
 
-@pytest.mark.parametrize("transform", sorted(TEXT_TRANSFORMS))
-@pytest.mark.parametrize(("scenario", "text"), TEXT_CASES, ids=IDS)
+#: Documented exclusion (see evaluation/metamorphic.py): case transforms are not applied to
+#: case-sensitive payloads such as base64. The pairs are filtered here, not skipped at runtime.
+M1_CASES = [
+    (s, t, name) for s, t in TEXT_CASES for name in sorted(TEXT_TRANSFORMS) if comparable(s, name)
+]
+
+
+@pytest.mark.parametrize(
+    ("scenario", "text", "transform"), M1_CASES, ids=[f"{s.id}-{n}" for s, _, n in M1_CASES]
+)
 def test_m1_case_and_whitespace_do_not_change_verdicts(
     scenario: Scenario, text: str, transform: str
 ) -> None:
-    if not comparable(scenario, transform):
-        pytest.skip("case-sensitive payload (documented exclusion)")
     before = _shape_insensitive(verdicts(EVALUATOR, scenario, text))
     after = _shape_insensitive(verdicts(EVALUATOR, scenario, TEXT_TRANSFORMS[transform](text)))
     assert after == before
+
+
+def test_m1_exclusions_are_few_and_explicit() -> None:
+    excluded = len(TEXT_CASES) * len(TEXT_TRANSFORMS) - len(M1_CASES)
+    assert excluded == 2  # sec-010 upper/lower: base64 secret in the response
 
 
 RAG_CASES = [(s, t) for s, t in TEXT_CASES if len({r.doc_id for r in s.retrieved}) >= 2]

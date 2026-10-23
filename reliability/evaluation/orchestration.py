@@ -8,6 +8,7 @@ import uuid
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
 
+from rag_app.interface import RAGSystem, RAGSystemError
 from reliability import __version__
 from reliability.checks.base import CheckContext
 from reliability.checks.provider_call import ProviderCallCheck
@@ -23,13 +24,22 @@ from reliability.evaluation.scoring import (
     total_usage,
     weighted_score,
 )
-from reliability.models import Document, Role, RunReport, Scenario, ScenarioResult, SelftestSummary
+from reliability.models import (
+    Document,
+    RetrievedRef,
+    Role,
+    RunReport,
+    Scenario,
+    ScenarioResult,
+    SelftestSummary,
+)
 from reliability.providers.base import (
     ContextDocument,
     GenerationParams,
     Provider,
     ProviderError,
     ProviderRequest,
+    ProviderResponse,
     RateLimited,
 )
 from reliability.reporting.redaction import Redactor
@@ -155,7 +165,8 @@ def assemble_report(
     *,
     results: Sequence[ScenarioResult],
     config: AppConfig,
-    provider: Provider,
+    provider_name: str,
+    model: str | None,
     run_id: str,
     started: datetime,
     finished: datetime,
@@ -177,8 +188,8 @@ def assemble_report(
         tool_version=__version__,
         target="rag-app" if target == "rag-app" else "scenarios",
         defects=list(defects),
-        provider=provider.name,
-        model=provider.model,
+        provider=provider_name,
+        model=model,
         scenario_files=dict(scenario_files),
         dataset_hash=dataset_hash,
         config=config.model_dump(mode="json"),
@@ -228,12 +239,93 @@ def run_suite(
     return assemble_report(
         results=results,
         config=config,
-        provider=provider,
+        provider_name=provider.name,
+        model=provider.model,
         run_id=run_id or new_run_id(started),
         started=started,
         finished=now(),
         target="scenarios",
         defects=(),
+        scenario_files=scenario_files or {},
+        dataset_hash=dataset_hash,
+    )
+
+
+# --------------------------------------------------------------------------- RAG system target
+
+
+class TargetSystemError(ProviderError):
+    """The RAG system under test raised instead of answering."""
+
+    kind = "target_error"
+
+
+def call_rag_system(
+    system: RAGSystem,
+    scenario: Scenario,
+    limits: LimitsConfig,
+    clock: Callable[[], float] = time.perf_counter,
+) -> tuple[Scenario, CallOutcome]:
+    """Ask the system under test. Returns the scenario with `retrieved` replaced by the
+    documents that actually reached the generator, plus the call outcome."""
+    started = clock()
+    try:
+        result = system.answer(scenario.query, scenario.user_access, trace_id=scenario.id)
+    except RAGSystemError as exc:
+        error = TargetSystemError(str(exc))
+        return scenario, CallOutcome(None, error, 1, stop_reason="target system error")
+    latency = round((clock() - started) * 1000, 3)
+    effective = scenario.model_copy(
+        update={"retrieved": [RetrievedRef(doc_id=d.doc_id, rank=d.rank) for d in result.context]}
+    )
+    text = result.answer
+    truncated = len(text) > limits.max_response_chars
+    response = ProviderResponse(
+        text=text[: limits.max_response_chars],
+        provider="rag-app",
+        model=result.generator,
+        latency_ms=latency,
+        latency_source="measured",
+        is_simulated=result.simulated,
+    )
+    return effective, CallOutcome(response, None, 1, truncated_by_limit=truncated)
+
+
+def run_rag_app(
+    *,
+    scenarios: Sequence[Scenario],
+    system: RAGSystem,
+    documents: Mapping[str, Document],
+    config: AppConfig,
+    redactor: Redactor,
+    defects: Sequence[str] = (),
+    generator_name: str | None = None,
+    scenario_files: Mapping[str, str] | None = None,
+    dataset_hash: str | None = None,
+    now: Callable[[], datetime] = utc_now,
+    run_id: str | None = None,
+) -> RunReport:
+    """Evaluate a RAG system through the `RAGSystem` protocol. Annotations stay in the
+    scenarios; retrieval comes from the system instead of the precomputed `retrieved` list."""
+    started = now()
+    evaluator = make_evaluator(config, documents, redactor)
+    results: list[ScenarioResult] = []
+    model = generator_name
+    for scenario in scenarios:
+        effective, outcome = call_rag_system(system, scenario, config.limits)
+        if outcome.response is not None:
+            model = outcome.response.model
+        results.append(evaluator.evaluate(effective, outcome))
+    return assemble_report(
+        results=results,
+        config=config,
+        provider_name="rag-app",
+        model=model,
+        run_id=run_id or new_run_id(started),
+        started=started,
+        finished=now(),
+        target="rag-app",
+        defects=defects,
         scenario_files=scenario_files or {},
         dataset_hash=dataset_hash,
     )

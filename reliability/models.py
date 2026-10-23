@@ -207,6 +207,8 @@ class Scenario(_Strict):
             raise ValueError("checks contain duplicates")
         if self.role is Role.SELFTEST and not self.expected_statuses:
             raise ValueError("selftest scenarios must declare expected_statuses")
+        if self.rag_app and self.role is not Role.GATE:
+            raise ValueError("only gate scenarios can be rag_app-eligible")
         if self.role is Role.GATE and self.expected_statuses:
             raise ValueError("gate scenarios must not declare expected_statuses")
         unknown = set(self.expected_statuses) - set(self.checks)
