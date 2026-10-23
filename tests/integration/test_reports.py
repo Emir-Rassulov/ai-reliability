@@ -166,3 +166,20 @@ def test_history_entry_commit(report: RunReport, tmp_path: Path) -> None:
     assert history_entry(report, "abc123")["commit"] == "abc123"
     append_history(report, tmp_path / "h.jsonl", "abc")
     assert (tmp_path / "h.jsonl").read_text(encoding="utf-8").count("\n") == 1
+
+
+def test_html_and_summary_edge_paths(report: RunReport) -> None:
+    """No findings, unknown metrics, a table without a note, reported token usage."""
+    from reliability.models import Role, TokenUsage
+
+    clean = report.model_copy(deep=True)
+    clean.scenarios = [s for s in clean.scenarios if s.role is Role.GATE]
+    clean.score = None
+    clean.token_usage = TokenUsage(input_tokens=12, output_tokens=7)
+    html = render_html(clean, Redactor(), [HtmlTable(title="t", columns=["a"], rows=[["1"]])])
+    assert "No findings." in html and "n/a" in html
+    assert "tokens reported: input 12, output 7" in render_summary(clean)
+
+
+def test_redactor_short_value_without_compact_form() -> None:
+    assert Redactor(["ab-12x9"]).redact("value ab-12x9 here") == "value ab-****x9 here"
