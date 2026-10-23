@@ -50,7 +50,7 @@ def _shape_insensitive(v: dict[str, Status]) -> dict[str, Status]:
 
 
 def test_dataset_has_enough_text_cases() -> None:
-    assert len(TEXT_CASES) >= 30
+    assert len(TEXT_CASES) >= 40
 
 
 @pytest.mark.parametrize("transform", sorted(TEXT_TRANSFORMS))

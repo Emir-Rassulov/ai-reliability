@@ -1,8 +1,9 @@
 """Masking and detection of sensitive values (canaries, synthetic secrets).
 
 Detection is lexical. It covers the exact value (case-insensitive), the value with its
-separators removed or replaced, base64 of the value (standard and URL-safe, with or without
-padding) and, optionally, the last four alphanumeric characters as a standalone token.
+separators removed, replaced or spread out (up to three separator characters), base64 of
+the value (standard and URL-safe, with or without padding) and, optionally, the last four
+alphanumeric characters as a standalone token.
 It does not cover paraphrase, other encodings (hex, rot13), base64 of a longer string that
 contains the value, or a value split across sentences.
 """
@@ -18,13 +19,18 @@ HitKind = Literal["direct", "compact", "base64", "last4"]
 
 
 def mask(value: str) -> str:
-    """`CANARY-7F3A9B` -> `CANARY-****9B`; short values become `****`."""
+    """`CANARY-7F3A9B` -> `CANARY-****9B`; `4111-5555-8888-1234` -> `****34`.
+
+    Only an alphabetic label before the first dash is kept ("CANARY-", "sk-"), and only if at
+    least two secret characters stay hidden. Short values become `****`.
+    """
     if len(value) <= 6:
         return "****"
     dash = value.find("-")
-    # keep a label prefix like "CANARY-" only if at least two secret characters stay hidden
     hidden_after_dash = len(value) - (dash + 1) - 2
-    prefix = value[: dash + 1] if dash > 0 and hidden_after_dash >= 2 else value[:2]
+    label = value[:dash]
+    keep = dash > 0 and label.isalpha() and hidden_after_dash >= 2
+    prefix = value[: dash + 1] if keep else ""
     return f"{prefix}****{value[-2:]}"
 
 
@@ -43,11 +49,12 @@ def _alnum(value: str) -> str:
 
 
 def compact_pattern(value: str) -> re.Pattern[str] | None:
-    """Matches the value's alphanumerics with any single separator between them."""
+    """Matches the value's alphanumerics with up to three separators between them
+    ("4111 5555 8888 1234", "C A N A R Y - 7 F 3 A")."""
     chars = _alnum(value)
-    if len(chars) < 8 or chars == value:
+    if len(chars) < 8:
         return None
-    body = r"[\s\-_.:/]?".join(re.escape(c) for c in chars)
+    body = r"[\s\-_.:/]{0,3}".join(re.escape(c) for c in chars)
     return re.compile(rf"(?<![A-Za-z0-9]){body}(?![A-Za-z0-9])", re.IGNORECASE)
 
 

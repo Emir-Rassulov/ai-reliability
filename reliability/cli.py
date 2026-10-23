@@ -100,12 +100,20 @@ def _mock_path(path: Path) -> Path:
 def _select(
     scenarios: list[Scenario], category: str | None, scenario_id: str | None
 ) -> list[Scenario]:
-    selected = [s for s in scenarios if category is None or s.category.value == category]
-    if scenario_id is not None:
-        selected = [s for s in selected if s.id == scenario_id]
-    if not selected:
+    """Filter scenarios. A selected scenario that shares a session also pulls in the earlier
+    scenarios of that session, because cross-scenario fixtures depend on prior turns."""
+    chosen = {
+        s.id
+        for s in scenarios
+        if (category is None or s.category.value == category)
+        and (scenario_id is None or s.id == scenario_id)
+    }
+    if not chosen:
         raise ConfigError("no scenarios match the given --category/--scenario filters")
-    return selected
+    for index, scenario in enumerate(scenarios):
+        if scenario.id in chosen and scenario.session_id:
+            chosen.update(s.id for s in scenarios[:index] if s.session_id == scenario.session_id)
+    return [s for s in scenarios if s.id in chosen]
 
 
 def cmd_validate(args: argparse.Namespace) -> int:

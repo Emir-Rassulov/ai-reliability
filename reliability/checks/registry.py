@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from reliability.checks.base import BaseCheck, Check, CheckContext
+from reliability.checks.data_leakage import DataLeakageCheck
 from reliability.checks.forbidden_content import ForbiddenContentCheck
 from reliability.checks.instruction_following import InstructionFollowingCheck
+from reliability.checks.prompt_injection import PromptInjectionCheck
 from reliability.checks.provider_call import ProviderCallCheck
 from reliability.checks.refusal import RefusalCheck
 from reliability.checks.required_facts import RequiredFactsCheck
@@ -24,6 +26,8 @@ CHECK_CLASSES: tuple[type[BaseCheck], ...] = (
     ContextQualityCheck,
     GroundingCheck,
     CitationCheck,
+    PromptInjectionCheck,
+    DataLeakageCheck,
 )
 
 #: Every name a scenario may list in `checks`.
