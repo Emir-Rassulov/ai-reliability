@@ -34,8 +34,16 @@ ABSTAIN_PATTERNS: tuple[str, ...] = (
     r"\bcannot be determined from\b",
     r"\bno information (?:about|on|regarding)\b",
 )
-_REFUSE = [re.compile(p, re.IGNORECASE) for p in REFUSAL_PATTERNS]
-_ABSTAIN = [re.compile(p, re.IGNORECASE) for p in ABSTAIN_PATTERNS]
+
+
+def _compile(pattern: str) -> re.Pattern[str]:
+    # Any run of whitespace (spaces, line breaks) matches a space in a pattern. Found by
+    # metamorphic relation M1: literal spaces made double-spaced refusals undetected.
+    return re.compile(pattern.replace(" ", r"\s+"), re.IGNORECASE)
+
+
+_REFUSE = [_compile(p) for p in REFUSAL_PATTERNS]
+_ABSTAIN = [_compile(p) for p in ABSTAIN_PATTERNS]
 
 Behavior = Literal["answer", "refuse", "abstain", "ambiguous", "empty"]
 

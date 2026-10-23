@@ -9,6 +9,10 @@ from reliability.checks.provider_call import ProviderCallCheck
 from reliability.checks.refusal import RefusalCheck
 from reliability.checks.required_facts import RequiredFactsCheck
 from reliability.checks.schema_validation import StructuredOutputCheck
+from reliability.rag.citation_validation import CitationCheck
+from reliability.rag.context_quality import ContextQualityCheck
+from reliability.rag.grounding import GroundingCheck
+from reliability.rag.retrieval_metrics import RetrievalMetricsCheck
 
 CHECK_CLASSES: tuple[type[BaseCheck], ...] = (
     RequiredFactsCheck,
@@ -16,6 +20,10 @@ CHECK_CLASSES: tuple[type[BaseCheck], ...] = (
     StructuredOutputCheck,
     RefusalCheck,
     InstructionFollowingCheck,
+    RetrievalMetricsCheck,
+    ContextQualityCheck,
+    GroundingCheck,
+    CitationCheck,
 )
 
 #: Every name a scenario may list in `checks`.

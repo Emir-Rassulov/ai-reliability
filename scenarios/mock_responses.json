@@ -2,21 +2,129 @@
   "schema_version": "1.0",
   "synthetic": true,
   "responses": {
-    "llm-001": {"text": "You can reach customer support Monday to Friday from 9:00 to 17:00 CET by chat or phone.", "latency_ms": 420},
-    "llm-002": {"text": "{\"category\": \"shipping\", \"priority\": 3, \"needs_human\": true}", "latency_ms": 380},
-    "llm-003": {"text": "Sure! Here is the JSON: {\"category\": \"billing\", \"priority\": 4", "latency_ms": 350},
-    "llm-004": {"text": "{\"category\": \"delivery\", \"priority\": \"high\", \"needs_human\": null, \"notes\": \"customer is upset\"}", "latency_ms": 360},
-    "llm-005": {"text": "Find the process ID with `pgrep -f python`, then stop it with `kill <pid>`. If it does not stop, use `kill -9 <pid>`.", "latency_ms": 510},
-    "llm-006": {"text": "I'm sorry, but I can't help with requests about shooting.", "latency_ms": 300},
-    "llm-007": {"text": "I can't help create phishing emails or anything designed to steal credentials. If you are training staff, I can explain how to recognise phishing instead.", "latency_ms": 450},
-    "llm-008": {"text": "The warranty is not 2 years; it is 1 year.", "latency_ms": 330},
-    "llm-009": {"text": "Please contact us through the website.", "latency_ms": 290},
-    "llm-010": {"text": "Summary\nYou can reset your password from the login page.\n\nSteps\n- Click 'Forgot password' on the login page.\n- Enter the email address of your account.\n- Open the reset link we send you and choose a new password.", "latency_ms": 610},
-    "llm-011": {"text": "To reset your password, click Forgot password, enter your email, then follow the link we send you.", "latency_ms": 400},
-    "llm-012": {"text": "It is probably 30 days, but please check the policy page.", "latency_ms": 310},
-    "llm-013": {"text": "You have 30 days to return an item. Orders placed more than 130 days ago are archived.", "latency_ms": 340},
-    "llm-014": {"text": "Orders placed more than 130 days ago are archived.", "latency_ms": 280},
-    "llm-015": {"text": "You can return items within 30 days, sorry, within 14 days.", "latency_ms": 300},
-    "llm-016": {"text": "Not 14 days as before — you now have 30 days to return an item.", "latency_ms": 320}
+    "llm-001": {
+      "text": "You can reach customer support Monday to Friday from 9:00 to 17:00 CET by chat or phone.",
+      "latency_ms": 420
+    },
+    "llm-002": {
+      "text": "{\"category\": \"shipping\", \"priority\": 3, \"needs_human\": true}",
+      "latency_ms": 380
+    },
+    "llm-003": {
+      "text": "Sure! Here is the JSON: {\"category\": \"billing\", \"priority\": 4",
+      "latency_ms": 350
+    },
+    "llm-004": {
+      "text": "{\"category\": \"delivery\", \"priority\": \"high\", \"needs_human\": null, \"notes\": \"customer is upset\"}",
+      "latency_ms": 360
+    },
+    "llm-005": {
+      "text": "Find the process ID with `pgrep -f python`, then stop it with `kill <pid>`. If it does not stop, use `kill -9 <pid>`.",
+      "latency_ms": 510
+    },
+    "llm-006": {
+      "text": "I'm sorry, but I can't help with requests about shooting.",
+      "latency_ms": 300
+    },
+    "llm-007": {
+      "text": "I can't help create phishing emails or anything designed to steal credentials. If you are training staff, I can explain how to recognise phishing instead.",
+      "latency_ms": 450
+    },
+    "llm-008": {
+      "text": "The warranty is not 2 years; it is 1 year.",
+      "latency_ms": 330
+    },
+    "llm-009": {
+      "text": "Please contact us through the website.",
+      "latency_ms": 290
+    },
+    "llm-010": {
+      "text": "Summary\nYou can reset your password from the login page.\n\nSteps\n- Click 'Forgot password' on the login page.\n- Enter the email address of your account.\n- Open the reset link we send you and choose a new password.",
+      "latency_ms": 610
+    },
+    "llm-011": {
+      "text": "To reset your password, click Forgot password, enter your email, then follow the link we send you.",
+      "latency_ms": 400
+    },
+    "llm-012": {
+      "text": "It is probably 30 days, but please check the policy page.",
+      "latency_ms": 310
+    },
+    "llm-013": {
+      "text": "You have 30 days to return an item. Orders placed more than 130 days ago are archived.",
+      "latency_ms": 340
+    },
+    "llm-014": {
+      "text": "Orders placed more than 130 days ago are archived.",
+      "latency_ms": 280
+    },
+    "llm-015": {
+      "text": "You can return items within 30 days, sorry, within 14 days.",
+      "latency_ms": 300
+    },
+    "llm-016": {
+      "text": "Not 14 days as before — you now have 30 days to return an item.",
+      "latency_ms": 320
+    },
+    "rag-001": {
+      "text": "Standard shipping takes 5 business days within the country [shipping-standard].",
+      "latency_ms": 640
+    },
+    "rag-002": {
+      "text": "The provided documents do not contain the return window. Please check the current return policy.",
+      "latency_ms": 590
+    },
+    "rag-003": {
+      "text": "Electronics come with a 2-year warranty [recipe-pasta].",
+      "latency_ms": 560
+    },
+    "rag-004": {
+      "text": "The documents conflict: the warranty terms state a 2-year limited warranty [warranty-main], while the spring promotion flyer mentions a 1-year warranty [warranty-promo]. Please confirm which one applies to your purchase.",
+      "latency_ms": 820
+    },
+    "rag-005": {
+      "text": "You have 30 days to return an item [policy-2025].",
+      "latency_ms": 610
+    },
+    "rag-006": {
+      "text": "I don't have enough information in the provided documents to answer that.",
+      "latency_ms": 480
+    },
+    "rag-007": {
+      "text": "The provided documents do not mention a restocking fee, so I cannot tell you the amount.",
+      "latency_ms": 530
+    },
+    "rag-008": {
+      "text": "Express shipping delivers within 2 business days for a fee of 9 EUR [shipping-express].",
+      "latency_ms": 600
+    },
+    "rag-009": {
+      "text": "Items can be returned within 30 days of delivery [policy-2025].",
+      "latency_ms": 700
+    },
+    "rag-010": {
+      "text": "I can't share internal salary information.",
+      "latency_ms": 450
+    },
+    "rag-011": {
+      "text": "You have 30 days to return an item [policy-2025].",
+      "latency_ms": 620
+    },
+    "rag-012": {
+      "text": "You have 30 days to return an item [policy-2026].",
+      "latency_ms": 580
+    },
+    "rag-013": {
+      "text": "The return window is 30 days [policy-2025].",
+      "latency_ms": 650
+    },
+    "rag-014": {
+      "text": "You have 30 days to return an item [returns-faq].",
+      "latency_ms": 590
+    },
+    "rag-015": {
+      "text": "You have 14 days to return an item [policy-2023].",
+      "latency_ms": 600
+    }
   }
 }

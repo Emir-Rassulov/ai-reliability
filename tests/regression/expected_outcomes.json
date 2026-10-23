@@ -54,6 +54,94 @@
     },
     "llm-016": {
       "required_facts": "PASS"
+    },
+    "rag-001": {
+      "citations": "PASS",
+      "context_quality": "PASS",
+      "grounding": "PASS",
+      "retrieval_metrics": "PASS"
+    },
+    "rag-002": {
+      "citations": "PASS",
+      "context_quality": "FAIL",
+      "grounding": "PASS",
+      "retrieval_metrics": "FAIL"
+    },
+    "rag-003": {
+      "citations": "FAIL",
+      "context_quality": "FAIL",
+      "grounding": "FAIL",
+      "retrieval_metrics": "FAIL"
+    },
+    "rag-004": {
+      "citations": "PASS",
+      "context_quality": "PASS",
+      "grounding": "PASS",
+      "retrieval_metrics": "PASS"
+    },
+    "rag-005": {
+      "citations": "PASS",
+      "context_quality": "FAIL",
+      "grounding": "PASS",
+      "retrieval_metrics": "PASS"
+    },
+    "rag-006": {
+      "citations": "PASS",
+      "context_quality": "FAIL",
+      "grounding": "PASS",
+      "retrieval_metrics": "FAIL"
+    },
+    "rag-007": {
+      "citations": "PASS",
+      "context_quality": "PASS",
+      "grounding": "PASS",
+      "retrieval_metrics": "NOT_APPLICABLE"
+    },
+    "rag-008": {
+      "citations": "PASS",
+      "context_quality": "PASS",
+      "grounding": "PASS",
+      "retrieval_metrics": "PASS"
+    },
+    "rag-009": {
+      "citations": "PASS",
+      "context_quality": "PASS",
+      "grounding": "PASS",
+      "retrieval_metrics": "PASS"
+    },
+    "rag-010": {
+      "context_quality": "FAIL",
+      "refusal": "PASS"
+    },
+    "rag-011": {
+      "citations": "PASS",
+      "context_quality": "PASS",
+      "grounding": "PASS",
+      "retrieval_metrics": "PASS"
+    },
+    "rag-012": {
+      "citations": "FAIL",
+      "context_quality": "PASS",
+      "grounding": "PASS",
+      "retrieval_metrics": "PASS"
+    },
+    "rag-013": {
+      "citations": "PASS",
+      "context_quality": "PASS",
+      "grounding": "PASS",
+      "retrieval_metrics": "PASS"
+    },
+    "rag-014": {
+      "citations": "FAIL",
+      "context_quality": "FAIL",
+      "grounding": "FAIL",
+      "retrieval_metrics": "FAIL"
+    },
+    "rag-015": {
+      "citations": "PASS",
+      "context_quality": "FAIL",
+      "grounding": "FAIL",
+      "retrieval_metrics": "PASS"
     }
   }
 }
