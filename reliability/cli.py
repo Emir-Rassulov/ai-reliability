@@ -16,8 +16,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from reliability import PROJECT_ROOT, __version__
+from reliability.checks.base import CheckContext
 from reliability.config import AppConfig, load_config
 from reliability.errors import ConfigError, ScenarioValidationError
+from reliability.evaluation.check_quality import evaluate_labeled, render_quality
 from reliability.evaluation.orchestration import run_suite
 from reliability.evaluation.regression import compare_reports, render_comparison
 from reliability.models import Category, Decision, Document, Role, RunReport, Scenario
@@ -47,6 +49,7 @@ DECISION_EXIT = {
 }
 DEFAULT_SCENARIOS = PROJECT_ROOT / "scenarios"
 DEFAULT_DATASET = PROJECT_ROOT / "datasets" / "synthetic_documents.json"
+DEFAULT_LABELED = PROJECT_ROOT / "tests" / "fixtures" / "labeled_cases.json"
 
 log = logging.getLogger("reliability")
 
@@ -95,6 +98,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     summ = sub.add_parser("summary", help="print a human-readable summary of a JSON report")
     summ.add_argument("--input", type=Path, required=True)
+
+    cq = sub.add_parser("check-quality", help="precision/recall of each check on a labeled set")
+    cq.add_argument("--labeled", type=Path, default=DEFAULT_LABELED)
+    cq.add_argument("--dataset", type=Path, default=DEFAULT_DATASET)
+    cq.add_argument("--config", type=Path, default=None)
 
     cmp_ = sub.add_parser("compare", help="compare two JSON reports (exit 1 on regression)")
     cmp_.add_argument("--baseline", type=Path, required=True)
@@ -219,6 +227,22 @@ def cmd_summary(args: argparse.Namespace) -> int:
     return EXIT_PASS
 
 
+def cmd_check_quality(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    documents = load_documents(args.dataset, config.limits)
+    if not args.labeled.exists():
+        raise ConfigError(f"labeled set not found: {args.labeled}")
+    results = evaluate_labeled(args.labeled, CheckContext(config=config, documents=documents))
+    print(render_quality(results), end="")
+    unexpected = [
+        c
+        for q in results.values()
+        for c in q.cases
+        if c.truth is not c.observed and not c.known_miss
+    ]
+    return EXIT_FAIL if unexpected else EXIT_PASS
+
+
 def cmd_compare(args: argparse.Namespace) -> int:
     comparison = compare_reports(load_report(args.baseline), load_report(args.current))
     print(render_comparison(comparison), end="")
@@ -236,6 +260,7 @@ COMMANDS = {
     "run": cmd_run,
     "summary": cmd_summary,
     "compare": cmd_compare,
+    "check-quality": cmd_check_quality,
 }
 
 
