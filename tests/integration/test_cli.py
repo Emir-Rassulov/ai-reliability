@@ -17,7 +17,7 @@ from tests.conftest import BASE_SCENARIO, write_json
 
 def make_suite(tmp_path: Path, scenarios: list[dict[str, Any]], responses: dict[str, Any]) -> Path:
     suite = tmp_path / "suite"
-    suite.mkdir()
+    suite.mkdir(parents=True)
     write_json(
         suite / "cases.json", {"schema_version": "1.0", "synthetic": True, "scenarios": scenarios}
     )

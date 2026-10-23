@@ -55,6 +55,52 @@
     "llm-016": {
       "required_facts": "PASS"
     },
+    "op-001": {
+      "provider_call": "PASS",
+      "required_facts": "PASS"
+    },
+    "op-002": {
+      "provider_call": "PASS",
+      "required_facts": "PASS"
+    },
+    "op-003": {
+      "provider_call": "PASS",
+      "required_facts": "PASS"
+    },
+    "op-004": {
+      "provider_call": "PASS",
+      "required_facts": "PASS"
+    },
+    "op-005": {
+      "provider_call": "ERROR",
+      "required_facts": "ERROR"
+    },
+    "op-006": {
+      "provider_call": "ERROR",
+      "required_facts": "ERROR"
+    },
+    "op-007": {
+      "provider_call": "ERROR",
+      "required_facts": "ERROR"
+    },
+    "op-008": {
+      "provider_call": "FAIL",
+      "required_facts": "FAIL"
+    },
+    "op-009": {
+      "provider_call": "FAIL",
+      "required_facts": "FAIL"
+    },
+    "op-010": {
+      "provider_call": "ERROR"
+    },
+    "op-011": {
+      "provider_call": "PASS",
+      "required_facts": "PASS"
+    },
+    "op-012": {
+      "provider_call": "FAIL"
+    },
     "rag-001": {
       "citations": "PASS",
       "context_quality": "PASS",

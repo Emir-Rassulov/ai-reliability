@@ -103,6 +103,8 @@ def _error_for(entry: MockEntry, scenario_id: str) -> ProviderError:
 class MockProvider:
     name = "mock"
     model: str | None = "mock-canned-v1"
+    #: Latency and backoff waits are simulated: the orchestrator records waits but does not sleep.
+    simulated_time = True
 
     def __init__(self, responses: dict[str, MockEntry]) -> None:
         self._responses = responses

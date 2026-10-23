@@ -9,7 +9,8 @@ from __future__ import annotations
 import argparse
 import logging
 import sys
-from collections.abc import Sequence
+import time
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -18,11 +19,15 @@ from reliability import PROJECT_ROOT, __version__
 from reliability.config import AppConfig, load_config
 from reliability.errors import ConfigError, ScenarioValidationError
 from reliability.evaluation.orchestration import run_suite
+from reliability.evaluation.regression import compare_reports, render_comparison
 from reliability.models import Category, Decision, Document, Role, RunReport, Scenario
 from reliability.providers.factory import SUPPORTED_PROVIDERS, build_provider
 from reliability.providers.mock_provider import load_mock_responses
-from reliability.reporting.json_report import write_report
+from reliability.reporting.history import append_history
+from reliability.reporting.html_report import HtmlTable, render_html
+from reliability.reporting.json_report import load_report, write_report
 from reliability.reporting.redaction import RedactingFilter, Redactor
+from reliability.reporting.summary import render_summary
 from reliability.scenarios import (
     MOCK_RESPONSES_FILE,
     LoadedScenarios,
@@ -83,6 +88,17 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--category", choices=[c.value for c in Category], default=None)
     run.add_argument("--scenario", default=None, help="run a single scenario by id")
     run.add_argument("--report-dir", type=Path, default=Path("reports"))
+    run.add_argument("--html", action="store_true", help="also write <report-dir>/<run_id>.html")
+    run.add_argument(
+        "--history-file", type=Path, default=None, help="append a compact summary (JSONL)"
+    )
+
+    summ = sub.add_parser("summary", help="print a human-readable summary of a JSON report")
+    summ.add_argument("--input", type=Path, required=True)
+
+    cmp_ = sub.add_parser("compare", help="compare two JSON reports (exit 1 on regression)")
+    cmp_.add_argument("--baseline", type=Path, required=True)
+    cmp_.add_argument("--current", type=Path, required=True)
     return parser
 
 
@@ -168,10 +184,45 @@ def cmd_run(args: argparse.Namespace) -> int:
         redactor=redactor,
         scenario_files=loaded.file_hashes,
         dataset_hash=sha256_file(args.dataset),
+        sleep=_sleep_for(provider),
     )
+    _write_outputs(report, args, redactor)
+    return DECISION_EXIT[report.decision.decision]
+
+
+def _sleep_for(provider: object) -> Callable[[float], None]:
+    """Simulated providers record backoff waits without sleeping; real ones really wait."""
+    if getattr(provider, "simulated_time", False):
+        return lambda _seconds: None
+    return time.sleep
+
+
+def _write_outputs(
+    report: RunReport,
+    args: argparse.Namespace,
+    redactor: Redactor,
+    tables: Sequence[HtmlTable] = (),
+) -> None:
     json_path = write_report(report, args.report_dir, redactor)
     _print_outcome(report, json_path)
-    return DECISION_EXIT[report.decision.decision]
+    if args.html:
+        html_path = args.report_dir / f"{report.run_id}.html"
+        html_path.write_text(render_html(report, redactor, tables), encoding="utf-8")
+        print(f"HTML: {html_path}")
+    if args.history_file is not None:
+        append_history(report, args.history_file)
+        print(f"History: appended to {args.history_file}")
+
+
+def cmd_summary(args: argparse.Namespace) -> int:
+    print(render_summary(load_report(args.input)), end="")
+    return EXIT_PASS
+
+
+def cmd_compare(args: argparse.Namespace) -> int:
+    comparison = compare_reports(load_report(args.baseline), load_report(args.current))
+    print(render_comparison(comparison), end="")
+    return EXIT_FAIL if comparison.has_regression else EXIT_PASS
 
 
 def _install_log_redaction(redactor: Redactor) -> None:
@@ -183,6 +234,8 @@ def _install_log_redaction(redactor: Redactor) -> None:
 COMMANDS = {
     "validate-scenarios": cmd_validate,
     "run": cmd_run,
+    "summary": cmd_summary,
+    "compare": cmd_compare,
 }
 
 

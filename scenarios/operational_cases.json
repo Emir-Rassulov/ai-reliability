@@ -1,0 +1,138 @@
+{
+  "schema_version": "1.0",
+  "synthetic": true,
+  "scenarios": [
+    {
+      "id": "op-001",
+      "name": "Timeout once, retry succeeds",
+      "category": "operational",
+      "severity": "high",
+      "tags": ["timeout", "retry"],
+      "input": {"messages": [{"role": "user", "content": "How long does standard shipping take?"}]},
+      "required_facts": [{"id": "time", "phrases": ["5 business days"]}],
+      "checks": ["provider_call", "required_facts"]
+    },
+    {
+      "id": "op-002",
+      "name": "429 with Retry-After, retry succeeds",
+      "category": "operational",
+      "severity": "high",
+      "tags": ["rate-limit", "retry-after"],
+      "input": {"messages": [{"role": "user", "content": "How long does express shipping take?"}]},
+      "required_facts": [{"id": "time", "phrases": ["2 business days"]}],
+      "checks": ["provider_call", "required_facts"]
+    },
+    {
+      "id": "op-003",
+      "name": "429 without Retry-After twice, exponential backoff, then success",
+      "category": "operational",
+      "severity": "high",
+      "tags": ["rate-limit", "backoff"],
+      "input": {"messages": [{"role": "user", "content": "When is support available?"}]},
+      "required_facts": [{"id": "hours", "phrases": ["9:00 to 17:00"]}],
+      "checks": ["provider_call", "required_facts"]
+    },
+    {
+      "id": "op-004",
+      "name": "503 twice, then success",
+      "category": "operational",
+      "severity": "high",
+      "tags": ["5xx", "retry"],
+      "input": {"messages": [{"role": "user", "content": "How do I delete my account?"}]},
+      "required_facts": [{"id": "where", "phrases": ["Settings"]}],
+      "checks": ["provider_call", "required_facts"]
+    },
+    {
+      "id": "op-005",
+      "name": "Selftest: authentication error is not retried and is an ERROR",
+      "category": "operational",
+      "severity": "high",
+      "role": "selftest",
+      "tags": ["auth", "non-retryable"],
+      "input": {"messages": [{"role": "user", "content": "How long does standard shipping take?"}]},
+      "required_facts": [{"id": "time", "phrases": ["5 business days"]}],
+      "checks": ["provider_call", "required_facts"],
+      "expected_statuses": {"provider_call": "ERROR", "required_facts": "ERROR"}
+    },
+    {
+      "id": "op-006",
+      "name": "Selftest: timeouts exhaust the retry budget",
+      "category": "operational",
+      "severity": "high",
+      "role": "selftest",
+      "tags": ["timeout", "retries-exhausted"],
+      "input": {"messages": [{"role": "user", "content": "How long does standard shipping take?"}]},
+      "required_facts": [{"id": "time", "phrases": ["5 business days"]}],
+      "checks": ["provider_call", "required_facts"],
+      "expected_statuses": {"provider_call": "ERROR", "required_facts": "ERROR"}
+    },
+    {
+      "id": "op-007",
+      "name": "Selftest: malformed provider payload",
+      "category": "operational",
+      "severity": "high",
+      "role": "selftest",
+      "tags": ["malformed"],
+      "input": {"messages": [{"role": "user", "content": "How long does standard shipping take?"}]},
+      "required_facts": [{"id": "time", "phrases": ["5 business days"]}],
+      "checks": ["provider_call", "required_facts"],
+      "expected_statuses": {"provider_call": "ERROR", "required_facts": "ERROR"}
+    },
+    {
+      "id": "op-008",
+      "name": "Selftest: empty response is an application FAIL, not an ERROR",
+      "category": "operational",
+      "severity": "high",
+      "role": "selftest",
+      "tags": ["empty-response"],
+      "input": {"messages": [{"role": "user", "content": "How long does standard shipping take?"}]},
+      "required_facts": [{"id": "time", "phrases": ["5 business days"]}],
+      "checks": ["provider_call", "required_facts"],
+      "expected_statuses": {"provider_call": "FAIL", "required_facts": "FAIL"}
+    },
+    {
+      "id": "op-009",
+      "name": "Selftest: response cut off by the model (finish_reason=length)",
+      "category": "operational",
+      "severity": "high",
+      "role": "selftest",
+      "tags": ["truncated"],
+      "input": {"messages": [{"role": "user", "content": "How long does standard shipping take?"}]},
+      "required_facts": [{"id": "time", "phrases": ["5 business days"]}],
+      "checks": ["provider_call", "required_facts"],
+      "expected_statuses": {"provider_call": "FAIL", "required_facts": "FAIL"}
+    },
+    {
+      "id": "op-010",
+      "name": "Selftest: Retry-After above the configured maximum stops retrying",
+      "category": "operational",
+      "severity": "high",
+      "role": "selftest",
+      "tags": ["rate-limit", "retry-after"],
+      "input": {"messages": [{"role": "user", "content": "How long does standard shipping take?"}]},
+      "checks": ["provider_call"],
+      "expected_statuses": {"provider_call": "ERROR"}
+    },
+    {
+      "id": "op-011",
+      "name": "Slow but successful response",
+      "category": "operational",
+      "severity": "medium",
+      "tags": ["latency"],
+      "input": {"messages": [{"role": "user", "content": "How many loyalty points equal a voucher?"}]},
+      "required_facts": [{"id": "points", "phrases": ["100 points"]}],
+      "checks": ["provider_call", "required_facts"]
+    },
+    {
+      "id": "op-012",
+      "name": "Selftest: response longer than max_response_chars",
+      "category": "operational",
+      "severity": "medium",
+      "role": "selftest",
+      "tags": ["response-limit"],
+      "input": {"messages": [{"role": "user", "content": "Tell me everything."}]},
+      "checks": ["provider_call"],
+      "expected_statuses": {"provider_call": "FAIL"}
+    }
+  ]
+}
