@@ -11,6 +11,7 @@ hierarchy by class name, which keeps the mapping testable without the package in
 from __future__ import annotations
 
 import importlib
+import os
 import time
 from collections.abc import Callable
 from typing import Any
@@ -89,6 +90,10 @@ class LiteLLMProvider:
         clock: Callable[[], float] = time.perf_counter,
     ) -> None:
         if module is None:
+            # LiteLLM downloads a model price list from GitHub when it is imported. That is an
+            # unrequested network call (found by the offline test's socket guard), so the
+            # bundled local copy is forced unless the user configured this explicitly.
+            os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
             try:
                 module = importlib.import_module("litellm")
             except ImportError as exc:

@@ -214,9 +214,20 @@ def test_rate_limit_retry_after_header() -> None:
 @pytest.mark.skipif(
     importlib.util.find_spec("litellm") is None, reason="[live] extra not installed"
 )
-def test_real_litellm_surface() -> None:
-    """Contract check against the installed package (run locally; CI never installs it)."""
+def test_real_litellm_surface(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Contract check against the installed package (run locally; CI never installs it).
+
+    Constructing the provider must import litellm without any network access: the autouse
+    socket guard fails this test if litellm fetches its remote price list on import.
+    """
+    import sys
+
+    monkeypatch.delitem(sys.modules, "litellm", raising=False)
+    monkeypatch.delenv("LITELLM_LOCAL_MODEL_COST_MAP", raising=False)
+    provider = LiteLLMProvider("ollama/llama3.2")
     import litellm
+
+    assert provider._litellm is litellm
 
     assert callable(litellm.completion)
     for name in (
