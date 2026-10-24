@@ -16,8 +16,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Only extras whose features are implemented in this build are declared.
-# [ui], [live] and [compare] belong to phases 6-8 (see README roadmap).
+# [compare] (phase 8) is not declared: that phase is not implemented in this build.
+live = [
+    "litellm>=1.50,<2",
+]
+ui = [
+    "streamlit>=1.40,<2",
+    "plotly>=5.24,<8",
+]
 dev = [
     "pytest>=8,<10",
     "pytest-cov>=5,<8",
@@ -30,7 +36,7 @@ dev = [
 ai-reliability = "reliability.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["reliability*", "rag_app*"]
+include = ["reliability*", "rag_app*", "dashboard*"]
 
 [tool.ruff]
 line-length = 100

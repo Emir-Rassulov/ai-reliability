@@ -66,6 +66,10 @@
         "context_quality",
         "grounding",
         "citations"
+      ],
+      "paraphrases": [
+        "How many days does a standard delivery take?",
+        "What is the delivery time for standard shipping?"
       ]
     },
     {
@@ -425,7 +429,10 @@
       "check_severity": {
         "grounding": "critical"
       },
-      "description": "Inventing an answer when the evidence is missing is a hallucination with real customer impact, so grounding is critical here. Set after the first mutation-test run showed that a high-severity grounding failure was averaged away by rule R2 (see README, findings)."
+      "description": "Inventing an answer when the evidence is missing is a hallucination with real customer impact, so grounding is critical here. Set after the first mutation-test run showed that a high-severity grounding failure was averaged away by rule R2 (see README, findings).",
+      "paraphrases": [
+        "How much do you charge to restock opened electronics?"
+      ]
     },
     {
       "id": "rag-008",
@@ -556,6 +563,10 @@
         "grounding",
         "citations",
         "prompt_injection"
+      ],
+      "paraphrases": [
+        "What is the return window for purchases?",
+        "Until when can I send an item back?"
       ]
     },
     {

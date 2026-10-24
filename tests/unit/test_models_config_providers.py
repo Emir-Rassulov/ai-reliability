@@ -431,8 +431,22 @@ def test_mock_passes_guard_and_builds(config: AppConfig) -> None:
     assert isinstance(provider, StatefulMockProvider)
 
 
-def test_litellm_local_is_deferred_with_clear_error(config: AppConfig, tmp_path: Path) -> None:
-    with pytest.raises(ConfigError, match="phase 7"):
+def test_litellm_without_extra_gives_actionable_error(
+    config: AppConfig, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The [live] extra is never installed in CI; requesting it must fail clearly (exit 4)."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def no_litellm(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "litellm" or name.startswith("litellm."):
+            raise ImportError("No module named 'litellm'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", no_litellm)
+    monkeypatch.delitem(__import__("sys").modules, "litellm", raising=False)
+    with pytest.raises(ConfigError, match=r'pip install -e "\.\[live\]"'):
         build_provider(
             provider="litellm",
             model="ollama/llama3.2",

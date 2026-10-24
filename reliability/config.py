@@ -83,6 +83,14 @@ class CostConfig(_Cfg):
     pricing_file: str | None = None
 
 
+class LiveConfig(_Cfg):
+    runs: int = Field(default=5, ge=1, le=50)
+    #: A check regresses when its pass rate drops by more than this below the baseline.
+    regression_margin: float = Field(default=0.2, ge=0, le=1)
+    metamorphic_runs: int = Field(default=3, ge=1, le=20)
+    metamorphic_irrelevant_doc: str = "recipe-pasta"
+
+
 class AppConfig(_Cfg):
     scoring: ScoringConfig = ScoringConfig()
     release: ReleaseConfig = ReleaseConfig()
@@ -90,6 +98,7 @@ class AppConfig(_Cfg):
     checks: ChecksConfig = ChecksConfig()
     limits: LimitsConfig = LimitsConfig()
     cost: CostConfig = CostConfig()
+    live: LiveConfig = LiveConfig()
 
 
 _ENV_OVERRIDES: dict[str, tuple[str, str]] = {

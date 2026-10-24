@@ -18,16 +18,27 @@ from dotenv import load_dotenv
 
 # The CLI is the composition root: the only module that wires the reference app in.
 from rag_app import build_reference_app
+from rag_app.callable_generator import CallableGenerator
 from rag_app.defects import DEFECTS as DEFECT_NAMES
+from rag_app.interface import RAGSystem, RAGSystemError
 from reliability import PROJECT_ROOT, __version__
 from reliability.checks.base import CheckContext
 from reliability.config import AppConfig, load_config
 from reliability.errors import ConfigError, ScenarioValidationError
 from reliability.evaluation.check_quality import evaluate_labeled, render_quality
+from reliability.evaluation.live import (
+    compare_live,
+    load_record,
+    model_metamorphic,
+    render_live,
+    render_metamorphic,
+    repeated_run,
+)
 from reliability.evaluation.mutation import matrix_table, mutation_test, render_mutation
-from reliability.evaluation.orchestration import run_rag_app, run_suite
+from reliability.evaluation.orchestration import call_with_retries, run_rag_app, run_suite
 from reliability.evaluation.regression import compare_reports, render_comparison
-from reliability.models import Category, Decision, Document, Role, RunReport, Scenario
+from reliability.models import Category, Decision, Document, Message, Role, RunReport, Scenario
+from reliability.providers.base import GenerationParams, Provider, ProviderRequest
 from reliability.providers.factory import SUPPORTED_PROVIDERS, build_provider
 from reliability.providers.mock_provider import load_mock_responses
 from reliability.reporting.history import append_history
@@ -124,6 +135,28 @@ def build_parser() -> argparse.ArgumentParser:
     mut.add_argument("--target", choices=("rag-app",), default="rag-app")
     mut.add_argument("--report-dir", type=Path, default=Path("reports"))
     mut.add_argument("--html", action="store_true")
+    _live_args(mut)
+
+    lr = sub.add_parser(
+        "live-regression",
+        help="repeat each scenario N times and compare pass rates with a baseline (exit 1)",
+    )
+    _add_common(lr)
+    _live_args(lr)
+    lr.add_argument("--category", choices=[c.value for c in Category], default=None)
+    lr.add_argument("--scenario", default=None)
+    lr.add_argument("--runs", type=int, default=None, help="repeats per scenario (default: config)")
+    lr.add_argument("--baseline", type=Path, default=None, help="compare with this record")
+    lr.add_argument("--output", type=Path, default=None, help="write the record here")
+
+    mm = sub.add_parser(
+        "model-metamorphic",
+        help="paraphrase / reorder / irrelevant-document variants; consistency per scenario",
+    )
+    _add_common(mm)
+    _live_args(mm)
+    mm.add_argument("--scenario", default=None)
+    mm.add_argument("--output", type=Path, default=None)
 
     cq = sub.add_parser("check-quality", help="precision/recall of each check on a labeled set")
     cq.add_argument("--labeled", type=Path, default=DEFAULT_LABELED)
@@ -207,12 +240,51 @@ def _rag_app_scenarios(scenarios: list[Scenario], args: argparse.Namespace) -> l
     return selected
 
 
-def _run_rag_app(args: argparse.Namespace) -> int:
-    if args.provider != "mock":
-        raise ConfigError(
-            "--target rag-app uses the app's own offline generator; a live generator belongs "
-            "to phase 7, which is not implemented in this build"
+def _live_args(p: argparse.ArgumentParser, default_provider: str = "mock") -> None:
+    p.add_argument("--provider", default=default_provider, choices=SUPPORTED_PROVIDERS)
+    p.add_argument("--model", default=None, help="model name, e.g. ollama/llama3.2 (litellm)")
+    p.add_argument("--api-base", default=None, help="API base URL for local models")
+    p.add_argument("--allow-network", action="store_true", help="permit network access")
+    p.add_argument("--allow-paid", action="store_true", help="permit paid hosted models")
+
+
+def _provider_from(args: argparse.Namespace, config: AppConfig) -> Provider:
+    return build_provider(
+        provider=args.provider,
+        model=args.model,
+        api_base=args.api_base,
+        allow_network=args.allow_network,
+        allow_paid=args.allow_paid,
+        config=config,
+        mock_responses_path=_mock_path(args.path),
+    )
+
+
+def _generator_factory(
+    args: argparse.Namespace, config: AppConfig
+) -> Callable[[frozenset[str]], RAGSystem]:
+    """Reference app factory: offline mock generator, or a live model as the generator."""
+    if args.provider == "mock":
+        return build_reference_app
+    provider = _provider_from(args, config)
+
+    def complete(messages: list[dict[str, str]]) -> str:
+        request = ProviderRequest(
+            scenario_id="rag-app",
+            system=messages[0]["content"],
+            messages=[Message(role="user", content=messages[-1]["content"])],
+            params=GenerationParams(timeout_s=config.limits.request_timeout_s),
         )
+        outcome = call_with_retries(provider, request, config.limits, _sleep_for(provider))
+        if outcome.response is None:
+            raise RAGSystemError(f"generator failed: {outcome.error} ({outcome.stop_reason})")
+        return outcome.response.text
+
+    name = f"{provider.name}:{provider.model}"
+    return lambda defects: build_reference_app(defects, generator=CallableGenerator(name, complete))
+
+
+def _run_rag_app(args: argparse.Namespace) -> int:
     config = load_config(args.config)
     documents = load_documents(args.dataset, config.limits)
     loaded = load_scenarios(args.path, documents, config.limits)
@@ -222,7 +294,7 @@ def _run_rag_app(args: argparse.Namespace) -> int:
     defects = sorted(set(args.defect))
     report = run_rag_app(
         scenarios=selected,
-        system=build_reference_app(defects),
+        system=_generator_factory(args, config)(frozenset(defects)),
         documents=documents,
         config=config,
         redactor=redactor,
@@ -243,7 +315,7 @@ def cmd_mutation_test(args: argparse.Namespace) -> int:
     _install_log_redaction(redactor)
     result = mutation_test(
         scenarios=selected,
-        factory=build_reference_app,
+        factory=_generator_factory(args, config),
         defects=sorted(DEFECT_NAMES),
         documents=documents,
         config=config,
@@ -356,6 +428,74 @@ def _install_log_redaction(redactor: Redactor) -> None:
         handler.addFilter(RedactingFilter(redactor))
 
 
+def _gate_selection(args: argparse.Namespace, scenarios: list[Scenario]) -> list[Scenario]:
+    selected = _select(scenarios, getattr(args, "category", None), args.scenario)
+    return [s for s in selected if s.role is Role.GATE] or selected
+
+
+def _write_json(path: Path, data: object) -> None:
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def cmd_live_regression(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    provider = _provider_from(args, config)
+    documents = load_documents(args.dataset, config.limits)
+    loaded = load_scenarios(args.path, documents, config.limits)
+    selected = _gate_selection(args, loaded.scenarios)
+    redactor = Redactor(collect_sensitive_values(loaded.scenarios))
+    _install_log_redaction(redactor)
+    runs = args.runs if args.runs is not None else config.live.runs
+    if runs < 1:
+        raise ConfigError("--runs must be at least 1")
+    record = repeated_run(
+        scenarios=selected,
+        provider=provider,
+        documents=documents,
+        config=config,
+        redactor=redactor,
+        runs=runs,
+        sleep=_sleep_for(provider),
+    )
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        _write_json(args.output, record)
+    if args.baseline is None:
+        print(render_live(record), end="")
+        return EXIT_PASS
+    margin = config.live.regression_margin
+    regressions, warnings = compare_live(load_record(args.baseline), record, margin)
+    print(render_live(record, regressions, warnings, margin), end="")
+    return EXIT_FAIL if regressions else EXIT_PASS
+
+
+def cmd_model_metamorphic(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    provider = _provider_from(args, config)
+    documents = load_documents(args.dataset, config.limits)
+    loaded = load_scenarios(args.path, documents, config.limits)
+    pool = [s for s in loaded.scenarios if s.role is Role.GATE and s.paraphrases]
+    if args.scenario is not None:
+        pool = [s for s in loaded.scenarios if s.id == args.scenario]
+    if not pool:
+        raise ConfigError("no scenarios with paraphrases match the filters")
+    redactor = Redactor(collect_sensitive_values(loaded.scenarios))
+    _install_log_redaction(redactor)
+    result = model_metamorphic(
+        scenarios=pool,
+        provider=provider,
+        documents=documents,
+        config=config,
+        redactor=redactor,
+        sleep=_sleep_for(provider),
+    )
+    print(render_metamorphic(result), end="")
+    if args.output is not None:
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        _write_json(args.output, result)
+    return EXIT_PASS
+
+
 COMMANDS = {
     "validate-scenarios": cmd_validate,
     "run": cmd_run,
@@ -363,6 +503,8 @@ COMMANDS = {
     "compare": cmd_compare,
     "check-quality": cmd_check_quality,
     "mutation-test": cmd_mutation_test,
+    "live-regression": cmd_live_regression,
+    "model-metamorphic": cmd_model_metamorphic,
 }
 
 

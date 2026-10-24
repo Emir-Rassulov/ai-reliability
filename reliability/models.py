@@ -194,6 +194,8 @@ class Scenario(_Strict):
     retrieval_thresholds: RetrievalThresholds | None = None
     #: Live providers only: tolerated share of answer sentences not mapped to annotations.
     max_unverified_ratio: float | None = Field(default=None, ge=0, le=1)
+    #: Hand-written paraphrases of the last user message, for model metamorphic relations.
+    paraphrases: list[str] = Field(default_factory=list)
     check_severity: dict[str, Severity] = Field(default_factory=dict)
     checks: list[str] = Field(min_length=1)
     #: Required for selftest scenarios: the verdict each check must produce.

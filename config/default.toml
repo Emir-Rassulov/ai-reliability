@@ -41,3 +41,9 @@ max_retry_after_s = 30.0
 cost_mode = "zero"
 # max_cost_usd = 1.00
 # pricing_file = "config/pricing.toml"
+
+[live]
+runs = 5                      # repeated runs per scenario for live regression
+regression_margin = 0.2       # allowed pass-rate drop below the baseline
+metamorphic_runs = 3          # repeats per variant for model metamorphic relations
+metamorphic_irrelevant_doc = "recipe-pasta"

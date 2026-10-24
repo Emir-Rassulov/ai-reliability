@@ -11,7 +11,7 @@ from pathlib import Path
 
 from rag_app.interface import RAGSystem
 from rag_app.mock_generator import MockGenerator
-from rag_app.pipeline import ReferenceRAG, load_corpus
+from rag_app.pipeline import Generator, ReferenceRAG, load_corpus
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CORPUS = ROOT / "datasets" / "synthetic_documents.json"
@@ -23,10 +23,12 @@ def build_reference_app(
     corpus_path: Path = DEFAULT_CORPUS,
     answers_path: Path = DEFAULT_ANSWERS,
     top_k: int = 3,
+    generator: Generator | None = None,
 ) -> RAGSystem:
+    """The reference app; the offline MockGenerator unless another generator is passed."""
     return ReferenceRAG(
         load_corpus(corpus_path),
-        MockGenerator.from_file(answers_path),
+        generator if generator is not None else MockGenerator.from_file(answers_path),
         top_k=top_k,
         defects=defects,
     )
