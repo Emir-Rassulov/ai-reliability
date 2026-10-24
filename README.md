@@ -13,7 +13,8 @@ It is a QA project, not an LLM wrapper. The questions it answers are:
 injected instructions, reliably under failures - and how do we know the evaluator itself
 is right?*
 
-Everything runs offline at zero cost. No API key is needed for anything in this build.
+Everything runs offline at zero cost by default; no API key is needed. A local model
+(Ollama through LiteLLM) and a Streamlit dashboard are optional extras.
 
 ---
 
@@ -31,12 +32,14 @@ Everything runs offline at zero cost. No API key is needed for anything in this 
 10. [Testing the tester](#testing-the-tester)
 11. [Metamorphic relations and what they found](#metamorphic-relations-and-what-they-found)
 12. [Reference RAG app and the defect detection matrix](#reference-rag-app-and-the-defect-detection-matrix)
-13. [Security controls and their limits](#security-controls-and-their-limits)
-14. [Zero-cost mode](#zero-cost-mode)
-15. [Extending: scenarios, checks, providers](#extending-scenarios-checks-providers)
-16. [Comparison with existing tools](#comparison-with-existing-tools)
-17. [Known limitations](#known-limitations)
-18. [Roadmap](#roadmap)
+13. [Dashboard](#dashboard)
+14. [Live provider: local models, live regression, model metamorphic relations](#live-provider-local-models-live-regression-model-metamorphic-relations)
+15. [Security controls and their limits](#security-controls-and-their-limits)
+16. [Zero-cost mode](#zero-cost-mode)
+17. [Extending: scenarios, checks, providers](#extending-scenarios-checks-providers)
+18. [Comparison with existing tools](#comparison-with-existing-tools)
+19. [Known limitations](#known-limitations)
+20. [Roadmap](#roadmap)
 
 ---
 
@@ -49,24 +52,40 @@ Everything runs offline at zero cost. No API key is needed for anything in this 
 | 3 Security | prompt injection (canaries), leakage incl. cross-session, redaction, security controls | **Done** |
 | 4 Operational | timeouts, 429, 5xx, auth, empty/malformed/truncated, bounded retries, latency, summary, compare, HTML | **Done** |
 | 5 Reference RAG app | BM25 pipeline behind `RAGSystem`, 5 injected defects, detection matrix | **Done** |
-| 6 Dashboard (Streamlit) | | Not implemented (roadmap) |
-| 7 Live provider (LiteLLM / Ollama) | | Not implemented (roadmap); only the cost guard and budget guard exist |
-| 8 Ragas / DeepEval comparison | | Not implemented (roadmap) |
+| 6 Dashboard (Streamlit) | overview, history, compare, RAG pipeline, bounded run launcher; public mode | **Done** |
+| 7 Live provider | LiteLLM (local Ollama by default), budget guard, live regression with repeated runs, model metamorphic relations, live generator for the reference app | **Done**, but never run against a real model here (see UNVERIFIED) |
+| 8 Ragas / DeepEval comparison | | **Deferred** - needs a running local judge model (see Roadmap) |
 
 Verified in the build environment (Linux, Python 3.12.3):
 
-* `pytest`: **702 passed** in about 2 s, fully offline.
-* Coverage (line / branch): `checks/` 99.8 % / 98.6 %, `rag/` 100 % / 100 %,
-  `evaluation/` 99.6 % / 98.3 %, `reporting/` 100 % / 100 %, `rag_app/` 100 % / 100 %.
-  CI enforces a combined minimum of 90 %.
+* Full environment (`.[dev,ui,live]`): **774 passed**, fully offline.
+* Clean core-only environment (`.[dev]`, exactly as the CI core job): **736 passed, 2 skipped**
+  (the dashboard tests without `[ui]`, the LiteLLM contract test without `[live]`); combined
+  coverage 98.95 %.
+* Coverage (line / branch): `checks/` 99.8 / 98.6 %, `rag/` 100 / 100 %, `evaluation/`
+  99.7 / 98.3 %, `reporting/` 100 / 100 %, `providers/` 100 / 98.9 %, `rag_app/` 100 / 100 %,
+  `dashboard/` 94 % combined. CI enforces 90 % for the core and for the dashboard.
 * `ruff check`, `ruff format --check`, `mypy --strict` on `reliability/` and `rag_app/`: clean.
 * Full suite on the mock provider: decision **PASS**, 31/31 evaluator self-tests reproduced.
 * Mutation test of the reference RAG app: every defect detected, acceptance criteria **MET**.
+* Dashboard: every page renders without exceptions on real reports and on empty data
+  (Streamlit `AppTest`), and was opened in headless Chromium for the screenshots below.
+* LiteLLM provider: checked against the installed `litellm` 1.106.2 - exception classes,
+  a real `ModelResponse` (via LiteLLM's built-in `mock_response`, no network), and a
+  refused connection to `127.0.0.1:9` mapped to a retryable `ProviderUnavailable`. End to
+  end, `run --provider litellm --model ollama/llama3.2 --allow-network` with no Ollama
+  running made 4 attempts (1 + 3 bounded retries) and ended with run status **ERROR**
+  (exit 3) - an infrastructure verdict, not an application FAIL.
 
-**UNVERIFIED:** the GitHub Actions workflow has not run on GitHub yet (its YAML was parsed
-and every step's command was run locally; the history-branch step was simulated against a
-local bare repository). The HTML report screenshot is not included because no browser was
-available in the build environment - see [Reports](#reports) for how to produce one.
+**UNVERIFIED:**
+* The GitHub Actions workflow has not run on GitHub yet. Its YAML was parsed, every
+  step's command was run locally in a clean venv, and the history-branch step was simulated
+  against a local bare repository.
+* No run against a real model: Ollama was not available in the build environment. The
+  commands in [Live provider](#live-provider-local-models-live-regression-model-metamorphic-relations)
+  were exercised with the mock provider and with fakes only.
+* The Streamlit Community Cloud deployment has not been done (it needs your account); there is
+  no live link yet.
 
 ## What is being tested
 
@@ -79,8 +98,11 @@ available in the build environment - see [Reports](#reports) for how to produce 
   the `RAGSystem` protocol. Retrieval metrics are computed on real retrieval and access
   control is tested where it is enforced. Deliberately injected defects prove that the
   evaluator catches real bugs, not only labelled fixtures.
-* **Live provider: not in this build.** A live model would send the same scenarios to a real
-  model; this is phase 7 (roadmap).
+* **Live provider (phase 7, optional).** The same scenarios send real prompts plus the
+  supplied retrieved context to a local model through LiteLLM, and the evaluator judges real
+  answers. Because live output is nondeterministic, regression uses repeated runs and pass
+  rates, and unmapped content in a live answer makes grounding `INCONCLUSIVE` unless the
+  scenario allows it. A live model can also be the generator of the reference app.
 * **Access control.** Without the reference app, access control can only be checked as
   "did a document with a disallowed access label appear in the supplied retrieved set".
   In every mode, a model refusing to disclose does **not** prove that retrieval enforces
@@ -95,7 +117,7 @@ Requirements: Python 3.12, `pip`. Linux and macOS commands shown; on Windows use
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev]"          # core + tests; add ,ui for the dashboard, ,live for LiteLLM
 
 python -m reliability.cli validate-scenarios
 python -m reliability.cli run --html
@@ -157,12 +179,14 @@ reliability/
   config.py            TOML + environment overrides
   scenarios.py         loading and validation with file/scenario/field error messages
   sensitive.py         masking and detection of secrets (exact, compact, base64, last-4)
-  providers/           Provider protocol, error hierarchy, mock providers, cost and budget guard
+  providers/           Provider protocol, error hierarchy, mock providers, cost and budget guard,
+                       litellm_provider (phase 7), prompting (untrusted-data prompt rendering)
   checks/              required_facts, forbidden_content, structured_output, refusal,
                        instruction_following, prompt_injection, data_leakage, provider_call
   rag/                 retrieval_metrics, context_quality, grounding, citation_validation
   evaluation/          evaluator, orchestration (retries, rag-app target), scoring, release,
-                       regression (compare), metamorphic, mutation, check_quality
+                       regression (compare), metamorphic, mutation, check_quality,
+                       live (live regression, model metamorphic relations)
   reporting/           json_report, summary, html_report, history, redaction
   cli.py               composition root
 rag_app/               the system under test; imports nothing from reliability/
@@ -171,7 +195,13 @@ rag_app/               the system under test; imports nothing from reliability/
   pipeline.py          search -> freshness -> access filter -> top-K -> prompt -> generation
   defects.py           switchable injected defects
   mock_generator.py    canned answers keyed by scenario and delivered context
-tests/                 unit, integration, rag, security, regression, fixtures (labeled cases)
+  callable_generator.py  any `complete(messages) -> str`, e.g. a live model
+dashboard/             phase 6, presentation only (needs the [ui] extra)
+  app.py               Streamlit entry point and navigation
+  data.py              loading and aggregation, plain functions, testable without Streamlit
+  runner.py            bounded run launcher over the orchestration API
+  components.py, theme.py, pages/ (overview, history, compare, rag_pipeline, run)
+tests/                 unit, integration, rag, security, regression, dashboard, fixtures
 ```
 
 Deviations from the planned structure, with reasons:
@@ -183,6 +213,8 @@ Deviations from the planned structure, with reasons:
 * `evaluation/check_quality.py` computes precision/recall of each check on the labeled set.
 * `rag_app/mock_generator.py` is separate from `pipeline.py` so a real generator can replace
   it without touching the pipeline.
+* `dashboard/runner.py` holds the run launcher so it can be tested without Streamlit, and
+  `requirements.txt` exists only for Streamlit Community Cloud.
 
 ## Scenarios: gate and selftest
 
@@ -290,14 +322,20 @@ python -m reliability.cli run [--provider mock] [--category llm|rag|security|ope
                               [--target scenarios|rag-app] [--defect NAME ...]
 python -m reliability.cli summary --input reports/<run_id>.json
 python -m reliability.cli compare --baseline A.json --current B.json
-python -m reliability.cli mutation-test [--html]
+python -m reliability.cli mutation-test [--html] [--provider ...]
 python -m reliability.cli check-quality
+python -m reliability.cli live-regression [--runs N] [--baseline B.json] [--output A.json] [--provider ...]
+python -m reliability.cli model-metamorphic [--scenario ID] [--output M.json] [--provider ...]
+streamlit run dashboard/app.py
+
+Provider options (run, mutation-test, live-regression, model-metamorphic):
+  --provider mock|litellm  --model ollama/<name>  --api-base URL  --allow-network  --allow-paid
 ```
 
 | Code | Meaning |
 |---|---|
 | 0 | PASS (for `compare`: no regression; for `mutation-test` / `check-quality`: criteria met) |
-| 1 | FAIL (for `compare`: regression; for `mutation-test`: an evaluator gap; for `check-quality`: an unexpected disagreement) |
+| 1 | FAIL (for `compare` and `live-regression`: regression; for `mutation-test`: an evaluator gap; for `check-quality`: an unexpected disagreement) |
 | 2 | REVIEW_REQUIRED |
 | 3 | run status ERROR (infrastructure, provider failure, or evaluator self-test mismatch) |
 | 4 | configuration, argument or scenario validation error (including a refused paid model) |
@@ -323,9 +361,7 @@ on prior turns.
 * `--history-file` - one compact JSONL line per run (no evidence). In CI, pushes to `main`
   append it to `history/runs.jsonl` on a dedicated `history` branch.
 
-Screenshot of the HTML report: not included (no browser in the build environment). To add
-one, run `python -m reliability.cli run --html`, open the file, and save a screenshot as
-`docs/html-report.png`.
+![HTML report of the starter suite](docs/img/html-report.png)
 
 Sample `summary` (real output, abridged):
 
@@ -488,7 +524,139 @@ reproduced exactly. CI runs `mutation-test` on every push.
 written: the mock is told what a model *would* do. The three pipeline defects
 (`no_access_filter`, `stale_first`, `truncated_context`) change what really reaches the
 generator and are detected without that assumption. A real local model would test the
-behaviour defects genuinely but nondeterministically (phase 7, roadmap).
+behaviour defects genuinely but nondeterministically: `mutation-test --provider litellm
+--model ollama/<name> --allow-network` uses a live model as the generator (not run here, see
+UNVERIFIED), and its results should be repeated before being trusted.
+
+## Dashboard
+
+A Streamlit dashboard over the stored reports - the visual, shareable face of the project.
+It is presentation only: every number comes from `reports/*.json`, `reports/mutation-*.json`
+or `history/runs.jsonl`, comparisons reuse the CLI's `compare` logic, and runs go through
+the same orchestration API as the CLI. There is no evaluation, scoring or release logic in
+`dashboard/`.
+
+```bash
+pip install -e ".[dev,ui]"
+python -m reliability.cli run && python -m reliability.cli mutation-test   # some data
+streamlit run dashboard/app.py
+```
+
+| Page | Shows |
+|---|---|
+| Overview | decision with fired rules, metric cards with deltas and sparklines, findings filtered by status/category/severity/role with evidence, retrieval and grounding charts, security findings by type |
+| History | a chosen metric across runs (from the history file, or from stored reports if there is none); runs that got worse than the one before |
+| Compare | two runs: changed statuses, decision change, metric deltas |
+| RAG pipeline | stages with the checks that cover them and the defects caught there; the detection matrix |
+| Run | one bounded run: suite, reference app with an optional defect, or the full mutation test |
+
+![Dashboard overview](docs/img/dashboard-overview.png)
+![Defect detection matrix](docs/img/dashboard-rag-pipeline.png)
+![History](docs/img/dashboard-history.png)
+
+Design choices that follow from "real data only":
+
+* Cards compare a run with the previous run **against the same target** (suite vs reference
+  app), and show no latency delta between simulated and measured latency. The first
+  screenshot attempt compared a suite run with an app run and showed a "+515 ms" regression
+  that did not exist; that is why this rule is there.
+* There are no production metrics (users, traffic, uptime, cost): the project has no traffic.
+
+Safety:
+
+* **Public mode** (`AIREL_PUBLIC_MODE`, default on): the offline mock provider only; no model
+  or key fields; no uploads. With `AIREL_PUBLIC_MODE=false` the Run page also offers a *local*
+  model through the normal factory and cost guard; paid models are never unlocked from the UI.
+* One run at a time per process and at most `AIREL_UI_MAX_SCENARIOS` (default 60) scenarios.
+* Report content (model output, evidence, explanations) is shown only through `st.code` and
+  `st.dataframe`, which display it as text; `unsafe_allow_html` is never used (AST test), and
+  the only `st.html` call injects the constant theme CSS. Values from files that end up in
+  Markdown-rendered captions or in Plotly labels are restricted to known values. A test puts
+  `<script>`, a Markdown link and `onerror=` into a report and checks they stay inert.
+* Data locations: `AIREL_REPORT_DIR` (default `reports/`), `AIREL_HISTORY_FILE`
+  (default `history/runs.jsonl`).
+
+Deploying to Streamlit Community Cloud (**UNVERIFIED** - needs your account; no live link yet):
+
+1. Push the repository to GitHub (public, or private with Streamlit's GitHub access).
+2. On share.streamlit.io choose *Create app*, select the repository and branch, and set the
+   main file path to `dashboard/app.py`. Dependencies come from `requirements.txt`, which
+   mirrors the core dependencies plus the `[ui]` extra.
+3. In *Advanced settings* choose Python 3.12. Leave `AIREL_PUBLIC_MODE` unset (public mode
+   is the default); no secrets are needed.
+4. Deploy. A fresh deployment has no reports (they are git-ignored): use the Run page, which
+   writes to the app's temporary storage and is lost when the app restarts. For persistent
+   trends, point `AIREL_HISTORY_FILE` at a copy of `history/runs.jsonl` from the `history`
+   branch.
+5. Replace this step list's UNVERIFIED note with the live link once it works.
+
+## Live provider: local models, live regression, model metamorphic relations
+
+Install the extra and run a local model with Ollama (free; nothing leaves your machine):
+
+```bash
+pip install -e ".[dev,live]"
+ollama pull llama3.2              # any small instruct model
+python -m reliability.cli run --provider litellm --model ollama/llama3.2 --allow-network
+python -m reliability.cli run --target rag-app --provider litellm --model ollama/llama3.2 --allow-network
+```
+
+None of these commands has been run against a real model in this build (UNVERIFIED).
+
+Hardware (general guidance, not measured here): small quantised instruct models of a few
+billion parameters typically run on a recent laptop CPU with 8-16 GB RAM, slowly; a GPU makes repeated runs practical. Small
+local models follow instructions and citation formats less reliably than large hosted
+models, so expect more `FAIL` and `INCONCLUSIVE` verdicts - which is what the repeated-run
+method is for.
+
+How the provider works:
+
+* Retrieved documents, reference context and structured fields go into a delimited
+  `<untrusted>` block with an explicit "data, not instructions" note (`providers/prompting.py`).
+* LiteLLM's own retries are off (`num_retries=0`); the evaluator's bounded retry loop handles
+  timeouts, 429 (with `Retry-After`) and 5xx. LiteLLM exceptions are mapped by class name;
+  unknown exceptions become a retryable "unavailable" error, never a pass.
+* Token usage and latency are recorded only as returned or measured.
+* **Finding:** `import litellm` downloads a model price list from GitHub. The offline suite's
+  socket guard caught this. The provider now forces LiteLLM's bundled local copy
+  (`LITELLM_LOCAL_MODEL_COST_MAP=True`, unless you set it yourself), and a contract test
+  imports LiteLLM under the socket guard.
+
+Privacy: with a local model, prompts stay on your machine. With a hosted model (only after
+`--allow-paid --allow-network`), every prompt - including the synthetic documents, canaries
+and secrets - is sent to that provider; the evaluator still redacts its own reports, but it
+cannot redact what the provider receives. Use synthetic data only.
+
+**Live regression** - one run proves little on a nondeterministic model:
+
+```bash
+python -m reliability.cli live-regression --provider litellm --model ollama/llama3.2 \
+    --allow-network --runs 5 --output baselines/llama3.2.json        # record a baseline
+python -m reliability.cli live-regression --provider litellm --model ollama/llama3.2 \
+    --allow-network --runs 5 --baseline baselines/llama3.2.json      # exit 1 on regression
+```
+
+Each scenario runs N times; for every check the pass rate is PASS / (PASS + FAIL), with
+ERROR and INCONCLUSIVE counted separately. A check regresses when its pass rate falls more
+than `live.regression_margin` (default 0.2) below the baseline. The record keeps the model,
+a hash of the exact prompt per scenario and a config hash; a changed prompt, model or config
+is reported as a warning rather than silently compared.
+
+**Model metamorphic relations** - verdicts should not depend on wording or document order:
+
+```bash
+python -m reliability.cli model-metamorphic --provider litellm --model ollama/llama3.2 --allow-network
+```
+
+Variants are built from annotations, never generated by a model: the hand-written
+`paraphrases` of a scenario, the retrieved documents in reverse order, and an added
+irrelevant document. Each variant runs `live.metamorphic_runs` times (default 3);
+consistency is the share of variant verdicts equal to the original's majority verdict.
+`retrieval_metrics` and `context_quality` are excluded because the variants change retrieval
+by construction. Four scenarios carry paraphrases (`llm-001`, `rag-001`, `rag-007`,
+`rag-009`). With the mock provider consistency is 100 % by construction; a test with a
+deliberately inconsistent fake model shows the measure drops. Inconsistency is a finding
+about the model, not a failure of this project.
 
 ## Security controls and their limits
 
@@ -503,6 +671,8 @@ behaviour defects genuinely but nondeterministically (phase 7, roadmap).
 | Full prompts and responses are not logged; only a redacted 300-char excerpt is stored | leaking whole conversations into logs | - |
 | Offline suite fails on any socket connection (autouse fixture) and a full run opens no socket (tested) | accidental network calls and cost | - |
 | `.env` git-ignored; secrets only from environment variables; `.env.example` lists names only | committed credentials | - |
+| LiteLLM forced to its bundled price list; the contract test imports it under the socket guard | an unrequested network call on import | network calls a future LiteLLM version might add elsewhere |
+| Dashboard: public mode, one run at a time, scenario limit, report content as inert text | abuse of a public deployment; script or link injection via report files | a determined attacker with write access to the report folder |
 
 ## Zero-cost mode
 
@@ -513,13 +683,14 @@ behaviour defects genuinely but nondeterministically (phase 7, roadmap).
   or socket exists**, with exit code 4 and the unlock instructions (tested with a socket
   spy). Paid needs `--allow-paid` (or `cost_mode = "allow_paid"`) **and** `--allow-network`.
 * `BudgetGuard` stops a run before a request could exceed `max_cost_usd`. Prices come only
-  from a user-supplied pricing file; input tokens are bounded by UTF-8 bytes (byte-level
-  tokenizers cannot emit more tokens than bytes), output by `max_tokens`. It is tested with a
-  fake paid provider; it gets wired into the factory together with a live provider (phase 7).
-* Everything in this build runs on the mock provider and the offline reference app, at zero
-  cost. A live local model (Ollama via LiteLLM) is phase 7; until then
-  `--provider litellm --model ollama/<name> --allow-network` passes the guard and then
-  stops with a clear "phase 7 is not implemented" message.
+  from a user-supplied pricing file (`[models."<name>"]` with `input_per_1k_usd` and
+  `output_per_1k_usd`); input tokens are bounded by UTF-8 bytes (byte-level tokenizers cannot
+  emit more tokens than bytes), output by `max_tokens`. The factory wraps every unlocked paid
+  model in it when `max_cost_usd` is set, and refuses to start if the pricing file is missing
+  or has no entry for the model. Tested: a request over budget never reaches the provider.
+* Every phase that is implemented runs free: the core, the reference app, the dashboard and
+  the mutation test on the mock; live work on a local Ollama model. The trade-off: small
+  local models are weaker than large hosted ones, so live verdicts are noisier.
 
 ## Extending: scenarios, checks, providers
 
@@ -570,20 +741,22 @@ between the two is phase 8 (roadmap).
 * `rag-013` exposes a ranking weakness of BM25 without source authority (not fixed).
 * The labeled set and the scenarios were written by the checks' author, so they are
   optimistic by construction.
-* Phases 6, 7 and 8 are not implemented.
+* Phase 7 has not been run against a real model; phase 8 is not implemented.
+* The dashboard reads files; on Streamlit Community Cloud anything written at runtime is lost
+  on restart.
 
 ## Roadmap
 
-* **Phase 6 - Streamlit dashboard** over stored reports and `history/runs.jsonl`
-  (overview, history, compare, RAG pipeline with the detection matrix, safe run launcher in
-  public mode with the mock provider only). The history file it would read is already
-  produced by CI.
-* **Phase 7 - live provider** through LiteLLM (local Ollama by default, hosted APIs only
-  with the explicit unlock), usable as the reference app's generator; live regression with
-  repeated runs (default 5) and a pass-rate margin; model-side metamorphic relations
-  (hand-written paraphrases, shuffled documents, an added irrelevant document).
-* **Phase 8 - Ragas and DeepEval** on the RAG scenarios with a local judge; agreement rate
-  and an analysis of every disagreement against the annotations.
+* **Run phase 7 for real:** a baseline and a regression run on a local model, model
+  metamorphic consistency, and the mutation test with a live generator; record the results
+  here.
+* **Phase 8 - Ragas and DeepEval** on the RAG scenarios with a local judge (zero cost, same
+  cost guard for the judge model); agreement rate with the deterministic checks and an
+  analysis of every disagreement against the annotations, with hedged conclusions (judge
+  scores are not ground truth). Deferred because it can only be meaningful with a running
+  judge model, which was not available in the build environment; writing the adapters
+  without being able to run them would produce exactly the kind of unverified result this
+  project avoids.
 * **Native LLM judge** behind its own protocol, kept separate from the deterministic checks
   (design only, not in code): `Judge.judge(scenario, response, criterion) -> JudgeVerdict`
   with a verdict, a rationale, the judge model id and a confidence, subject to the same cost
