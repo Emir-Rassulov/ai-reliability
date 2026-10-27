@@ -75,7 +75,7 @@ Everything runs offline at zero cost by default; no API key is needed. A local m
 | 4 Operational | timeouts, 429, 5xx, auth, empty/malformed/truncated, bounded retries, latency, summary, compare, HTML | **Done** |
 | 5 Reference RAG app | BM25 pipeline behind `RAGSystem`, 5 injected defects, detection matrix | **Done** |
 | 6 Dashboard (Streamlit) | overview, history, compare, RAG pipeline, bounded run launcher; public mode | **Done** |
-| 7 Live provider | LiteLLM (local Ollama by default), budget guard, live regression with repeated runs, model metamorphic relations, live generator for the reference app | **Done.** `run`, `model-metamorphic` and the live mutation test run on llama3.2 (3B) via Ollama, which found and fixed real bugs; `live-regression` not yet run on a real model |
+| 7 Live provider | LiteLLM (local Ollama by default), budget guard, live regression with repeated runs, model metamorphic relations, live generator for the reference app | **Done and run on a real model:** `run`, `live-regression`, `model-metamorphic` and the live mutation test on llama3.2 (3B) via Ollama; the runs found and fixed real bugs |
 | 8 Ragas / DeepEval comparison | | **Deferred** - needs a running local judge model (see Roadmap) |
 
 Verified (Linux, Python 3.12.3, and macOS on Intel):
@@ -107,14 +107,14 @@ Run against real local models (Ollama on an Intel Mac, CPU only, 2026-10-25 to 1
   exposed a bug no fake could show: `run` also sent the 31 self-test fixtures to the live
   model, so they "mismatched" and the decision was ERROR (R0). Live runs now use gate
   scenarios only.
-* `model-metamorphic` and `mutation-test` with llama3.2 3B as the generator. The live mutation
+* `live-regression` (baseline + second run of the same model: no false regression),
+  `model-metamorphic` and `mutation-test` with llama3.2 3B as the generator. The live mutation
   test found a real evaluator gap (a confidential salary figure leaked without its canary
   went unnoticed by `data_leakage`), now fixed - see
   [the detection matrix section](#reference-rag-app-and-the-defect-detection-matrix).
 * Results and the evaluator's measured accuracy: [Measured quality on real replies](#measured-quality-on-real-replies).
 
 **UNVERIFIED:**
-* `live-regression` has not been run against a real model yet (tested with fakes only).
 * `model-metamorphic` results on a real model are not backed by stored replies yet.
 * The Streamlit Community Cloud deployment has not been done; there is no live link yet.
 
@@ -816,6 +816,15 @@ than `live.regression_margin` (default 0.2) below the baseline. The record keeps
 a hash of the exact prompt per scenario and a config hash; a changed prompt, model or config
 is reported as a warning rather than silently compared.
 
+**Real run (llama3.2 3B, Intel Mac CPU, 2026-10-27).** A baseline and a second run of the
+**same** model, 28 gate scenarios x 5 runs each (`baselines/llama3.2.json`,
+`baselines/llama3.2-run2.json`). Result: *no regression beyond the margin* - the right
+verdict, since nothing changed. 63 of 65 check rates were identical; two moved by one run in
+five: `llm-010` instruction_following 80 % -> 100 % and `llm-013` required_facts
+100 % -> 80 %. The second is exactly the margin, so with 5 runs the default 0.2 tolerates one
+flipped run and flags two. That is a deliberate trade-off, not proof of stability: with this
+few runs a real 20-point drop is indistinguishable from noise; more runs narrow it.
+
 **Model metamorphic relations** - verdicts should not depend on wording or document order:
 
 ```bash
@@ -960,7 +969,9 @@ between the two is phase 8 (roadmap).
 * Phrase lists are literal: "9:00 CET to 17:00 CET" misses "9:00 to 17:00".
 * A scenario only finds what its checks look for: invented content in a reply to a
   scenario without a grounding / forbidden-content check goes unnoticed (seen in a real run).
-* Phase 7: `live-regression` is not yet run on a real model; Phase 8 is not implemented.
+* Live regression with 5 runs per scenario cannot separate a one-run flip from a real drop
+  of 20 points; the margin is a trade-off (see the real run above). Phase 8 is not
+  implemented.
 * A mutation test with a live generator cannot distinguish an evaluator miss from a defect
   that did not change the model's behaviour; the saved runs must be read.
 * The dashboard reads files; on Streamlit Community Cloud anything written at runtime is lost
