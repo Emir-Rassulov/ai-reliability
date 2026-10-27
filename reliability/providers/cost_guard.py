@@ -4,7 +4,8 @@ The classification is an explicit allowlist, not a guess:
 
 * ``mock``  - the offline mock provider.
 * ``local`` - a LiteLLM model name with the ``ollama/`` or ``ollama_chat/`` prefix whose API
-  base resolves to a loopback host (default ``http://localhost:11434``).
+  base resolves to a loopback host (default ``http://localhost:11434``), or the generic
+  ``http`` provider pointed at a loopback URL (an app running on this machine).
 * ``paid``  - everything else, including unknown providers and unknown model names.
 
 All decisions happen before any provider object is created, so a refused model can never
@@ -38,6 +39,9 @@ class CostTier(StrEnum):
 def classify_model(provider: str, model: str | None, api_base: str | None = None) -> CostTier:
     if provider == "mock":
         return CostTier.MOCK
+    if provider == "http":
+        host = urlparse(api_base or "").hostname
+        return CostTier.LOCAL if host in LOCAL_HOSTS else CostTier.PAID
     if provider == "litellm" and model and model.startswith(LOCAL_MODEL_PREFIXES):
         host = urlparse(api_base or DEFAULT_OLLAMA_API_BASE).hostname
         if host in LOCAL_HOSTS:
@@ -69,7 +73,9 @@ def check_cost_guard(
         if not allow_network:
             raise CostGuardError("paid models also require --allow-network")
     elif tier is CostTier.LOCAL and not allow_network:
-        raise ConfigError("local models are served over HTTP on localhost; pass --allow-network")
+        raise ConfigError(
+            "local models and apps are served over HTTP on localhost; pass --allow-network"
+        )
     return tier
 
 

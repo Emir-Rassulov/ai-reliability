@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# Import pandas fully before anything else: Plotly imports it lazily, and when Streamlit
+# triggers that first import from two script threads at once, one of them can see a
+# half-initialised module ("partially initialized module 'pandas'"), seen on Python 3.14.
+import pandas  # noqa: E402, F401
 import streamlit as st  # noqa: E402
 
 from dashboard.components import apply_css, mode_badge  # noqa: E402

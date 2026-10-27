@@ -28,7 +28,7 @@ with st.form("run"):
     target = st.selectbox("Target", list(TARGETS), format_func=lambda k: TARGETS[k])
     category = st.selectbox("Category", ["all", "llm", "rag", "security", "operational"])
     scenario_ids = ["all"] + [sid for sid, _, _ in scenarios]
-    scenario = st.selectbox("Single scenario", scenario_ids, help="Overrides nothing else.")
+    scenario = st.selectbox("Single scenario", scenario_ids)
     defect = st.selectbox(
         "Injected defect (reference RAG app only)", ["none", *sorted(DEFECTS)], index=0
     )
@@ -38,8 +38,9 @@ with st.form("run"):
         provider = st.selectbox(
             "Provider",
             ["mock", "litellm"],
-            help="litellm = a local model such as ollama/llama3.2. Paid models are never "
-            "allowed from the dashboard.",
+        )
+        st.caption(
+            "litellm = a local model such as ollama/llama3.2; paid models are never allowed."
         )
         model = st.text_input("Local model (litellm)", value="ollama/llama3.2") or None
     submitted = st.form_submit_button("Start run")

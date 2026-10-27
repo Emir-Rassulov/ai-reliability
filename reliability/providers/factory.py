@@ -9,10 +9,11 @@ from reliability.config import AppConfig
 from reliability.errors import ConfigError
 from reliability.providers.base import Provider
 from reliability.providers.cost_guard import BudgetGuard, CostTier, check_cost_guard, load_pricing
+from reliability.providers.http_provider import HttpProvider, load_target
 from reliability.providers.litellm_provider import LiteLLMProvider
 from reliability.providers.mock_provider import StatefulMockProvider, load_mock_responses
 
-SUPPORTED_PROVIDERS = ("mock", "litellm")
+SUPPORTED_PROVIDERS = ("mock", "litellm", "http")
 
 
 def build_provider(
@@ -25,7 +26,17 @@ def build_provider(
     config: AppConfig,
     mock_responses_path: Path,
     litellm_module: Any = None,
+    target_config: Path | None = None,
 ) -> Provider:
+    target = None
+    if provider == "http":
+        if target_config is None:
+            raise ConfigError(
+                "--provider http needs --target-config <file.toml> describing the app's API"
+            )
+        target = load_target(target_config)
+        api_base = target.url  # the cost tier is decided by where the app runs
+        model = target.name
     tier = check_cost_guard(
         provider=provider,
         model=model,
@@ -36,6 +47,8 @@ def build_provider(
     )
     if provider == "mock":
         return StatefulMockProvider(load_mock_responses(mock_responses_path))
+    if provider == "http" and target is not None:
+        return HttpProvider(target)
     if provider == "litellm":
         if not model:
             raise ConfigError("--provider litellm needs --model, e.g. ollama/llama3.2")

@@ -11,3 +11,4 @@ coverage.xml
 htmlcov/
 reports/*
 !reports/.gitkeep
+history/

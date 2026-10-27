@@ -16,7 +16,7 @@ if reports:
     ids = [r.run_id for r in reversed(reports)]
     wanted = st.session_state.get("selected_run")
     index = ids.index(wanted) if wanted in ids else 0
-    run_id = st.selectbox("Run", ids, index=index, help="Newest first.")
+    run_id = st.selectbox("Run (newest first)", ids, index=index)
     current = by_id[run_id]
     position = reports.index(current)
     previous = data.previous_comparable(reports, current)
@@ -56,7 +56,10 @@ if reports:
         "Role",
         ["gate", "selftest"],
         default=[],
-        help="gate = release candidate; selftest = known-bad fixtures the evaluator must catch.",
+    )
+    st.caption(
+        "Role: gate = the release candidate; selftest = known-bad fixtures the evaluator "
+        "must catch (their failures are expected)."
     )
     rows = data.findings(
         current,

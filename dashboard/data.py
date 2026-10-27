@@ -124,7 +124,11 @@ class Card:
 def _num(value: float | None, pct: bool = False) -> str:
     if value is None:
         return "n/a"
-    return f"{value:.1%}" if pct else f"{value:,.0f}"
+    if pct:
+        return f"{value:.1%}"
+    # Small values (e.g. sub-millisecond latency of the offline RAG app) keep decimals
+    # instead of being rounded to a misleading "0".
+    return f"{value:,.0f}" if value == 0 or abs(value) >= 10 else f"{value:.2g}"
 
 
 def _delta(cur: float | None, prev: float | None, pct: bool = False) -> str | None:
@@ -155,14 +159,14 @@ def metric_cards(current: RunReport, previous: RunReport | None) -> list[Card]:
             if prev_d is None or prev_d.decision is cur_d.decision
             else f"was {prev_d.decision.value}",
             "off",
-            "First fired rule of the release policy (README: Scoring and release decision).",
+            "first fired release rule",
         ),
         Card(
             "Pass rate",
             _num(cur_d.pass_rate, pct=True),
             _delta(cur_d.pass_rate, prev_d.pass_rate if prev_d else None, pct=True),
             "normal",
-            "PASS / (PASS + FAIL) over gate checks.",
+            "PASS / (PASS + FAIL) over gate checks",
         ),
     ]
     for status, label in (
@@ -172,7 +176,7 @@ def metric_cards(current: RunReport, previous: RunReport | None) -> list[Card]:
     ):
         cur, prev = count(current, status), count(previous, status)
         cards.append(
-            Card(label, _num(cur), _delta(cur, prev), "inverse", f"{status.value} gate checks.")
+            Card(label, _num(cur), _delta(cur, prev), "inverse", f"{status.value} gate checks")
         )
     cur_lat = current.latency.median_ms
     prev_lat = previous.latency.median_ms if previous else None
@@ -187,7 +191,7 @@ def metric_cards(current: RunReport, previous: RunReport | None) -> list[Card]:
             _num(cur_lat),
             _delta(cur_lat, prev_lat),
             "inverse",
-            f"Median over gate calls; source: {source}.",
+            f"median over gate calls, {source}",
         )
     )
     return cards

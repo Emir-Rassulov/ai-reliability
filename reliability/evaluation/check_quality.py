@@ -9,6 +9,10 @@ true failure (truth FAIL); a detection is an observed FAIL.
 
 `known_miss` marks a documented limitation: the check is expected to disagree with truth.
 Known misses are counted in the metrics, never hidden.
+
+A labeled set may name a scenario suite (`scenarios_path`, relative to the project root); a
+case with `"scenario": "<id>"` is then judged against that real scenario's annotations, so
+labels on real application replies use exactly the configuration the run used.
 """
 
 from __future__ import annotations
@@ -18,10 +22,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from reliability import PROJECT_ROOT
 from reliability.checks.base import CheckContext
 from reliability.checks.registry import build_checks
 from reliability.models import Scenario, Status
 from reliability.providers.base import ProviderResponse
+from reliability.scenarios import load_scenarios
 
 BASE: dict[str, Any] = {
     "id": "labeled",
@@ -87,10 +93,21 @@ def _scenario(base: dict[str, Any], check: str, overrides: dict[str, Any]) -> Sc
 def evaluate_labeled(path: Path, ctx: CheckContext) -> dict[str, CheckQuality]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     checks = build_checks(ctx)
+    suite: dict[str, Scenario] = {}
+    if "scenarios_path" in raw:
+        loaded = load_scenarios(
+            PROJECT_ROOT / raw["scenarios_path"], ctx.documents, ctx.config.limits
+        )
+        suite = {s.id: s for s in loaded.scenarios}
     out: dict[str, CheckQuality] = {}
     for case in raw["cases"]:
         name = case["check"]
-        scenario = _scenario(raw["bases"].get(name, {}), name, case.get("overrides", {}))
+        if "scenario" in case:
+            scenario = suite[case["scenario"]].model_copy(update={"checks": [name]})
+        else:
+            scenario = _scenario(
+                raw.get("bases", {}).get(name, {}), name, case.get("overrides", {})
+            )
         response = ProviderResponse(text=case["response"], provider="labeled", is_simulated=True)
         observed = checks[name].run(scenario, response).status
         out.setdefault(name, CheckQuality(name)).cases.append(

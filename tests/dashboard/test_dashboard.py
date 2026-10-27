@@ -225,7 +225,7 @@ def test_figures_build() -> None:
         "supported",
         "omitted",
     )
-    assert components.donut_figure({"x": 1}, "t").data[0].hole == 0.6
+    assert components.donut_figure({"x": 1}, "t").data[0].hole == 0.55
     assert components.trend_figure([("a", 1.0, "PASS")], "t").data[0].mode == "lines+markers"
     assert components.bar_figure({"n": 3.0}, "t", percent=False).data[0].text == ("3",)
 

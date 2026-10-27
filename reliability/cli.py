@@ -102,6 +102,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--model", default=None, help="model name, e.g. ollama/llama3.2 (litellm only)"
     )
     run.add_argument("--api-base", default=None, help="API base URL for local models")
+    run.add_argument(
+        "--target-config", type=Path, default=None, help="TOML file describing an HTTP app (http)"
+    )
     run.add_argument("--allow-network", action="store_true", help="permit network access")
     run.add_argument("--allow-paid", action="store_true", help="permit paid hosted models")
     run.add_argument("--category", choices=[c.value for c in Category], default=None)
@@ -244,6 +247,9 @@ def _live_args(p: argparse.ArgumentParser, default_provider: str = "mock") -> No
     p.add_argument("--provider", default=default_provider, choices=SUPPORTED_PROVIDERS)
     p.add_argument("--model", default=None, help="model name, e.g. ollama/llama3.2 (litellm)")
     p.add_argument("--api-base", default=None, help="API base URL for local models")
+    p.add_argument(
+        "--target-config", type=Path, default=None, help="TOML file describing an HTTP app (http)"
+    )
     p.add_argument("--allow-network", action="store_true", help="permit network access")
     p.add_argument("--allow-paid", action="store_true", help="permit paid hosted models")
 
@@ -257,6 +263,7 @@ def _provider_from(args: argparse.Namespace, config: AppConfig) -> Provider:
         allow_paid=args.allow_paid,
         config=config,
         mock_responses_path=_mock_path(args.path),
+        target_config=args.target_config,
     )
 
 
@@ -349,6 +356,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         allow_paid=args.allow_paid,
         config=config,
         mock_responses_path=_mock_path(args.path),
+        target_config=args.target_config,
     )
     documents = load_documents(args.dataset, config.limits)
     loaded = load_scenarios(args.path, documents, config.limits)

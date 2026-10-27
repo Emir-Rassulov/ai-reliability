@@ -57,9 +57,6 @@
         "rag-008",
         "rag-009"
       ],
-      "prompt_injection": [
-        "rag-009"
-      ],
       "retrieval_metrics": [
         "rag-004",
         "rag-008",

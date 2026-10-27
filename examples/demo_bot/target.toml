@@ -1,0 +1,15 @@
+# How ai-reliability talks to the Nimbus Books demo bot.
+# Copy this file and change url / body / response_text_path to test your own app.
+
+[http]
+name = "nimbus-books-demo-bot"
+url = "http://127.0.0.1:8765/chat"
+response_text_path = "reply"
+
+[http.body]
+message = "{last_user_message}"
+session_id = "{session_id}"
+
+# For an app that needs an API key, put the key in an environment variable and map it here:
+# [http.secret_headers]
+# "Authorization" = "MY_BOT_TOKEN"

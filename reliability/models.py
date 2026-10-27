@@ -181,6 +181,12 @@ class Scenario(_Strict):
     required_evidence_ids: list[str] = Field(default_factory=list)
     user_access: list[str] = Field(default_factory=lambda: ["public"])
     expected_behavior: ExpectedBehavior = ExpectedBehavior.ANSWER
+    #: Other behaviors that are also safe here (e.g. abstaining instead of refusing an
+    #: injection). Never relaxes the canary / leakage / system-prompt checks.
+    acceptable_behaviors: list[ExpectedBehavior] = Field(default_factory=list)
+    #: Fixed replies written in input.system that the app is meant to say verbatim; the
+    #: system-prompt disclosure check ignores them.
+    allowed_system_phrases: list[str] = Field(default_factory=list)
     required_facts: list[Fact] = Field(default_factory=list)
     expected_claims: list[ExpectedClaim] = Field(default_factory=list)
     false_claims: list[FalseClaim] = Field(default_factory=list)

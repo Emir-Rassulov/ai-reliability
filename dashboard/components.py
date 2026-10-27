@@ -48,6 +48,8 @@ def load_or_explain(loaded: Loaded) -> list[RunReport]:
 
 
 def metric_cards(cards: Sequence[Card], sparklines: dict[str, list[float]] | None = None) -> None:
+    # No `help=` tooltips: in Streamlit a clicked tooltip stays pinned open. The explanations
+    # are shown once, as a caption under the cards.
     sparklines = sparklines or {}
     for start in range(0, len(cards), 3):
         columns = st.columns(3)
@@ -59,12 +61,12 @@ def metric_cards(cards: Sequence[Card], sparklines: dict[str, list[float]] | Non
                     card.value,
                     delta=card.delta,
                     delta_color=card.delta_color,  # type: ignore[arg-type]
-                    help=card.help,
                     border=True,
                     chart_data=spark if spark and len(spark) > 1 else None,
                     chart_type="line",
                     delta_arrow="off" if card.delta_color == "off" else "auto",
                 )
+    st.caption(" · ".join(f"{c.label}: {c.help}" for c in cards))
 
 
 def bar_figure(values: dict[str, float | None], title: str, *, percent: bool = True) -> go.Figure:
@@ -77,20 +79,38 @@ def bar_figure(values: dict[str, float | None], title: str, *, percent: bool = T
             orientation="h",
             marker_color=theme.COLORS["accent"],
             text=[f"{n:.0%}" if percent else f"{n:g}" for n in numbers],
-            textposition="auto",
+            textposition="inside",
+            insidetextanchor="end",
+            textfont={"color": "#ffffff", "size": 13},
         )
     )
-    xaxis = {"range": [0, 1], "tickformat": ".0%"} if percent else {}
+    axis = {"gridcolor": theme.COLORS["border"], "automargin": True}
+    xaxis = {**axis, "range": [0, 1.0001], "tickformat": ".0%"} if percent else axis
     fig.update_layout(
-        **theme.plotly_layout(title=title, xaxis=xaxis, yaxis={"autorange": "reversed"})
+        **theme.plotly_layout(
+            title=title,
+            xaxis=xaxis,
+            yaxis={**axis, "autorange": "reversed", "ticksuffix": "  "},
+            margin={"l": 110, "r": 24, "t": 44, "b": 40},
+        )
     )
     return fig
 
 
 def count_figure(counts: dict[str, int], title: str) -> go.Figure:
     colors = [theme.COLORS["pass"] if k == "supported" else theme.COLORS["fail"] for k in counts]
-    fig = go.Figure(go.Bar(x=list(counts), y=list(counts.values()), marker_color=colors))
-    fig.update_layout(**theme.plotly_layout(title=title))
+    fig = go.Figure(
+        go.Bar(
+            x=list(counts),
+            y=list(counts.values()),
+            marker_color=colors,
+            text=list(counts.values()),
+            textposition="inside",
+            textfont={"color": "#ffffff", "size": 13},
+            width=0.5,
+        )
+    )
+    fig.update_layout(**theme.plotly_layout(title=title, bargap=0.4))
     return fig
 
 
@@ -99,9 +119,12 @@ def donut_figure(counts: dict[str, int], title: str) -> go.Figure:
         go.Pie(
             labels=list(counts),
             values=list(counts.values()),
-            hole=0.6,
+            hole=0.55,
             marker={"colors": theme.SERIES[: len(counts)]},
             sort=False,
+            textinfo="value",
+            insidetextorientation="horizontal",
+            textfont={"color": "#ffffff", "size": 14},
         )
     )
     fig.update_layout(**theme.plotly_layout(title=title, showlegend=True))

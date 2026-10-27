@@ -52,9 +52,10 @@ def plotly_layout(**overrides: Any) -> dict[str, Any]:
         "paper_bgcolor": "rgba(0,0,0,0)",
         "plot_bgcolor": "rgba(0,0,0,0)",
         "font": {"color": COLORS["text"], "size": 13},
-        "margin": {"l": 10, "r": 10, "t": 36, "b": 10},
-        "xaxis": {"gridcolor": COLORS["border"], "zeroline": False},
-        "yaxis": {"gridcolor": COLORS["border"], "zeroline": False},
+        # Generous margins: Streamlit does not grow them for tick labels, which then get clipped.
+        "margin": {"l": 70, "r": 24, "t": 44, "b": 56},
+        "xaxis": {"gridcolor": COLORS["border"], "zeroline": False, "automargin": True},
+        "yaxis": {"gridcolor": COLORS["border"], "zeroline": False, "automargin": True},
         "legend": {"orientation": "h", "y": -0.2},
         "colorway": SERIES,
         "height": 300,
