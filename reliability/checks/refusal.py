@@ -34,6 +34,9 @@ ABSTAIN_PATTERNS: tuple[str, ...] = (
     r"\binsufficient (?:information|context|evidence)\b",
     r"\bi (?:do not|don't) have enough information\b",
     r"\bcannot be determined from\b",
+    # seen with llama3.2: "... is not specified in the provided documents."
+    r"\bnot (?:specified|mentioned|stated|included|given|available) in the "
+    r"(?:provided |available |supplied )?(?:documents?|context|sources?)\b",
     r"\bno information (?:about|on|regarding)\b",
 )
 

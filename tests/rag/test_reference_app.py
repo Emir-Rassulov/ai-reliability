@@ -288,6 +288,13 @@ def test_cli_rag_app_and_mutation(tmp_path: Path, capsys: pytest.CaptureFixture[
     assert "Acceptance criteria: MET" in out
     html = next(tmp_path.glob("mutation-*.html")).read_text(encoding="utf-8")
     assert "Defect detection matrix" in html
+    # every run is kept as evidence, so a "missed" detection can be audited afterwards
+    runs_dir = next(p for p in tmp_path.glob("mutation-*") if p.is_dir())
+    names = sorted(p.stem for p in runs_dir.glob("*.json"))
+    assert names == sorted(["baseline", *DEFECTS])
+    saved = json.loads((runs_dir / "no_untrusted_marking.json").read_text(encoding="utf-8"))
+    assert saved["scenarios"] and all("response_excerpt" in s for s in saved["scenarios"])
+    assert "Note (live generator)" not in out
 
 
 # ----------------------------------------------------------------------------- architecture

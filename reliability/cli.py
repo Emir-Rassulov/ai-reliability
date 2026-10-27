@@ -43,7 +43,7 @@ from reliability.providers.factory import SUPPORTED_PROVIDERS, build_provider
 from reliability.providers.mock_provider import load_mock_responses
 from reliability.reporting.history import append_history
 from reliability.reporting.html_report import HtmlTable, render_html
-from reliability.reporting.json_report import load_report, write_report
+from reliability.reporting.json_report import load_report, report_to_json, write_report
 from reliability.reporting.redaction import RedactingFilter, Redactor
 from reliability.reporting.summary import render_summary
 from reliability.scenarios import (
@@ -333,6 +333,17 @@ def cmd_mutation_test(args: argparse.Namespace) -> int:
     out = args.report_dir / f"mutation-{result.baseline.run_id}.json"
     out.write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"Matrix: {out}")
+    runs_dir = args.report_dir / f"mutation-{result.baseline.run_id}"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    for name, report in [("baseline", result.baseline), *sorted(result.runs.items())]:
+        (runs_dir / f"{name}.json").write_text(report_to_json(report, redactor), encoding="utf-8")
+    print(f"Runs (evidence per defect): {runs_dir}/")
+    if args.provider != "mock":
+        print(
+            "Note (live generator): 'missed' can also mean the defect did not change what the\n"
+            "model said (e.g. it ignored an injection even without the untrusted marking), and a\n"
+            "failing baseline check cannot flip. Check the saved runs before calling it a gap."
+        )
     if args.html:
         html_path = args.report_dir / f"mutation-{result.baseline.run_id}.html"
         html_path.write_text(
