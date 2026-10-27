@@ -126,3 +126,55 @@ def test_module_entry_point_subprocess(tmp_path: Path) -> None:
         check=False,
     )
     assert proc.returncode == 0, proc.stderr
+
+
+def test_live_run_skips_selftests(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Regression: the first real `run --provider litellm` sent the 31 self-tests (canned
+    known-bad answers) to the model and ended in R0 ERROR. A live run uses gate scenarios."""
+    from reliability import cli
+    from reliability.providers.mock_provider import StatefulMockProvider, load_mock_responses
+
+    canned = StatefulMockProvider(
+        load_mock_responses(PROJECT_ROOT / "scenarios" / "mock_responses.json")
+    )
+    monkeypatch.setattr(cli, "build_provider", lambda **_kw: canned)  # stands in for a live model
+    code = run_cli(
+        "run",
+        "--provider",
+        "litellm",
+        "--model",
+        "ollama/x",
+        "--allow-network",
+        "--report-dir",
+        str(tmp_path),
+    )
+    captured = capsys.readouterr()
+    assert code == 0, captured.out
+    assert "31 self-test scenario(s) skipped" in captured.err
+    report = json.loads(next(tmp_path.glob("*.json")).read_text())
+    assert report["selftest"]["total"] == 0
+    assert {s["role"] for s in report["scenarios"]} == {"gate"}
+
+
+def test_live_run_of_a_selftest_only_is_refused(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from reliability import cli
+
+    monkeypatch.setattr(cli, "build_provider", lambda **_kw: object())
+    code = run_cli(
+        "run",
+        "--provider",
+        "litellm",
+        "--model",
+        "ollama/x",
+        "--allow-network",
+        "--scenario",
+        "llm-006",
+        "--report-dir",
+        str(tmp_path),
+    )
+    assert code != 0
+    assert "need --provider mock" in capsys.readouterr().err

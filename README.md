@@ -15,6 +15,27 @@ is right?*
 Everything runs offline at zero cost by default; no API key is needed. A local model
 (Ollama through LiteLLM) and a Streamlit dashboard are optional extras.
 
+### Highlights
+
+* **12 checks, one release decision.** Facts, refusals and over-refusals, JSON schema,
+  instructions, retrieval metrics, grounding, citations, context quality, prompt injection
+  (canaries), data leakage, provider failures. Rules R0-R6 turn them into PASS / FAIL /
+  REVIEW_REQUIRED / ERROR; a critical failure cannot be averaged away.
+* **Tests any chatbot as a black box** over HTTP (`--provider http`), or a local model
+  directly (`--provider litellm`). Paid APIs are blocked unless explicitly unlocked.
+* **Run against real models.** A demo support bot backed by llama3.2 (1B and 3B) and
+  qwen2.5 (3B), and llama3.2 directly on the main suite, all on a laptop CPU. The runs found
+  real model faults (leaked secrets, obeyed injections, over-refusals, invented answers)
+  and real evaluator faults, which were fixed and turned into regression tests.
+* **The evaluator is tested too.** Self-test fixtures it must catch, mutation testing of a
+  reference RAG app, metamorphic relations, and precision / recall against hand labels -
+  including **blind** labels on real model replies, reported before any fix
+  ([results](#measured-quality-on-real-replies)).
+* **Engineering:** 838 tests, 98 % branch coverage, `mypy --strict`, CI on GitHub Actions,
+  Streamlit dashboard for runs, history and version comparison.
+
+![Dashboard overview](docs/img/dashboard-overview.png)
+
 ---
 
 ## Contents
@@ -54,15 +75,15 @@ Everything runs offline at zero cost by default; no API key is needed. A local m
 | 4 Operational | timeouts, 429, 5xx, auth, empty/malformed/truncated, bounded retries, latency, summary, compare, HTML | **Done** |
 | 5 Reference RAG app | BM25 pipeline behind `RAGSystem`, 5 injected defects, detection matrix | **Done** |
 | 6 Dashboard (Streamlit) | overview, history, compare, RAG pipeline, bounded run launcher; public mode | **Done** |
-| 7 Live provider | LiteLLM (local Ollama by default), budget guard, live regression with repeated runs, model metamorphic relations, live generator for the reference app | **Done**, but never run against a real model here (see UNVERIFIED) |
+| 7 Live provider | LiteLLM (local Ollama by default), budget guard, live regression with repeated runs, model metamorphic relations, live generator for the reference app | **Done.** `run` verified on llama3.2 (3B) via Ollama; `live-regression`, `model-metamorphic` and the live mutation test not yet run on a real model (see UNVERIFIED) |
 | 8 Ragas / DeepEval comparison | | **Deferred** - needs a running local judge model (see Roadmap) |
 
-Verified in the build environment (Linux, Python 3.12.3):
+Verified (Linux, Python 3.12.3, and macOS on Intel):
 
-* Full environment (`.[dev,ui,live]`): **774 passed**, fully offline.
-* Clean core-only environment (`.[dev]`, exactly as the CI core job): **736 passed, 2 skipped**
-  (the dashboard tests without `[ui]`, the LiteLLM contract test without `[live]`); combined
-  coverage 98.95 %.
+* Full environment (`.[dev,ui,live]`): **838 passed**, fully offline; branch coverage 98 %.
+* Clean core-only environment (`.[dev]`, exactly as the CI core job): **800 passed, 2 skipped**
+  (the dashboard tests without `[ui]`, the LiteLLM contract test without `[live]`).
+* GitHub Actions: all jobs green on the first push (2026-10-27).
 * Coverage (line / branch): `checks/` 99.8 / 98.6 %, `rag/` 100 / 100 %, `evaluation/`
   99.7 / 98.3 %, `reporting/` 100 / 100 %, `providers/` 100 / 98.9 %, `rag_app/` 100 / 100 %,
   `dashboard/` 94 % combined. CI enforces 90 % for the core and for the dashboard.
@@ -78,15 +99,20 @@ Verified in the build environment (Linux, Python 3.12.3):
   running made 4 attempts (1 + 3 bounded retries) and ended with run status **ERROR**
   (exit 3) - an infrastructure verdict, not an application FAIL.
 
+Run against real local models (Ollama on an Intel Mac, CPU only, 2026-10-25 to 10-27):
+
+* `--provider http`: the demo bot with llama3.2 1B (three prompt versions), llama3.2 3B and
+  qwen2.5 3B.
+* `--provider litellm`: `run` on the main gate scenarios with llama3.2 3B. The very first run
+  exposed a bug no fake could show: `run` also sent the 31 self-test fixtures to the live
+  model, so they "mismatched" and the decision was ERROR (R0). Live runs now use gate
+  scenarios only.
+* Results and the evaluator's measured accuracy: [Measured quality on real replies](#measured-quality-on-real-replies).
+
 **UNVERIFIED:**
-* The GitHub Actions workflow has not run on GitHub yet. Its YAML was parsed, every
-  step's command was run locally in a clean venv, and the history-branch step was simulated
-  against a local bare repository.
-* No run against a real model: Ollama was not available in the build environment. The
-  commands in [Live provider](#live-provider-local-models-live-regression-model-metamorphic-relations)
-  were exercised with the mock provider and with fakes only.
-* The Streamlit Community Cloud deployment has not been done (it needs your account); there is
-  no live link yet.
+* `live-regression`, `model-metamorphic` and `mutation-test` with a live generator have not
+  been run against a real model yet (tested with fakes only).
+* The Streamlit Community Cloud deployment has not been done; there is no live link yet.
 
 ## What is being tested
 
@@ -501,6 +527,36 @@ What the real replies exposed, and what was done:
   rule (a reply mixing a refusal and an "I don't know" sentence is ambiguous, synthetic
   case `rq-ambiguous`).
 
+#### Main suite, llama3.2 3B through LiteLLM (blind)
+
+28 gate scenarios, 58 verdicts that can be judged from the stored replies, labeled blind
+(replies and annotations only, before the verdicts were read):
+`tests/fixtures/labeled_real_main_llama.json`.
+
+| | agreeing | false FAIL | missed FAIL | precision | recall |
+|---|---|---|---|---|---|
+| **evaluator as it was (blind)** | **46 / 58** | **8** | **0** | **0.56** | **1.00** |
+| after the fixes below (same replies, optimistic) | 56 / 58 | 2 | 0 | 0.86 | 1.00 |
+
+On real output the evaluator was too strict: every real fault was caught (a leaked system
+prompt, an obeyed injection in a ticket field, invalid JSON, a misattributed citation,
+an outdated policy offered as current), but 8 correct answers were failed:
+
+* **Citation format** (5 false FAILs, citations and grounding). Asked to "cite sources as
+  [doc-ID]", the model wrote `[doc-ID: shipping-standard]` or `(doc-ID "warranty-main")`.
+  The strict pattern saw no citation at all. Fixed: labelled forms are recognised, and bare
+  ids in parentheses count when they are known document ids; citation-only sentences no
+  longer count as unverified content.
+* **"I can't fulfill that request."** was not recognised as a refusal (the verb list was too
+  narrow). Fixed: more refusal verbs, checked against both labeled sets.
+* **Not fixed (known limitations):** "9:00 CET to 17:00 CET" does not match the annotated
+  phrase "9:00 to 17:00", and a conflict described as "there is no single answer" does not
+  match "conflict / disagree / differ". Both need understanding beyond phrase lists.
+
+The "as it was" row counts two cases as agreeing although the stored 300-char excerpt
+lacks the fact: the full reply, which the evaluator saw, contained it, so its PASS was right
+(in the fixture these cases are labeled against the excerpt).
+
 **How to read these numbers.** The cumulative table above is optimistic: most fixes were
 made after looking at these very replies. The labels are one person's judgement, 104
 verdicts from two small models are a small sample, and the replies are the reports' 300-char
@@ -681,7 +737,13 @@ python -m reliability.cli run --provider litellm --model ollama/llama3.2 --allow
 python -m reliability.cli run --target rag-app --provider litellm --model ollama/llama3.2 --allow-network
 ```
 
-None of these commands has been run against a real model in this build (UNVERIFIED).
+With a live provider (`litellm` or `http`), `run` evaluates gate scenarios only: self-test
+fixtures check the evaluator against canned known-bad answers and need `--provider mock`.
+On a slow machine raise the per-request timeout, e.g. `AIREL_REQUEST_TIMEOUT_S=180`.
+
+`run --provider litellm --model ollama/llama3.2` has been run on a real model (Intel Mac, CPU;
+results in [Measured quality on real replies](#measured-quality-on-real-replies)); the rag-app
+variant and the commands below have not (UNVERIFIED).
 
 Hardware (general guidance, not measured here): small quantised instruct models of a few
 billion parameters typically run on a recent laptop CPU with 8-16 GB RAM, slowly; a GPU makes repeated runs practical. Small
@@ -859,11 +921,15 @@ between the two is phase 8 (roadmap).
   where a scenario lists `forbidden_markers` for it.
 * Partial compliance with an injected instruction is detected only when it leaks a canary or
   recites the prompt (seen in a real run).
+* Several main-suite `llm` and `operational` scenarios were written for canned answers: their
+  input does not contain the fact the annotation expects (e.g. "How long do I have to
+  return an item?" with no policy in the prompt). A live model can only guess, so its
+  verdict there says little about the model (seen in the llama3.2 run).
+* Phrase lists are literal: "9:00 CET to 17:00 CET" misses "9:00 to 17:00".
 * A scenario only finds what its checks look for: invented content in a reply to a
   scenario without a grounding / forbidden-content check goes unnoticed (seen in a real run).
-* The live LiteLLM path (phase 7) has not been run against a real model here; the HTTP
-  provider has (demo bot with llama3.2 1B and 3B, see "Measured quality on real replies"). Phase 8
-  is not implemented.
+* Phase 7 is verified for `run` only (llama3.2 3B); the repeated-run and metamorphic
+  commands are not yet run on a real model. Phase 8 is not implemented.
 * The dashboard reads files; on Streamlit Community Cloud anything written at runtime is lost
   on restart.
 

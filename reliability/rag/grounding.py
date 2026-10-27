@@ -19,6 +19,7 @@ insufficient and asserts no false claim.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from reliability.checks.base import BaseCheck
@@ -27,10 +28,17 @@ from reliability.checks.text import match_phrases as match
 from reliability.checks.text import phrase_pattern, prep, sentence_spans
 from reliability.models import CheckResult, ExpectedBehavior, Scenario, Status
 from reliability.providers.base import ProviderResponse
+from reliability.rag.citation_parsing import Citation, find_citations, strip_citations
 
 
-def unverified_ratio(text: str, phrases: list[str]) -> float:
+def unverified_ratio(
+    text: str, phrases: list[str], citation_spans: list[Citation] | None = None
+) -> float:
+    """Share of sentences mapped to no annotated claim. Citation markers are removed first, so
+    a sentence that is only a citation ("[doc-ID: policy-2025]") is not unverified content."""
     prepared = prep(text)
+    if citation_spans:
+        prepared = strip_citations(prepared, citation_spans)
     spans = sentence_spans(prepared)
     if not spans:
         return 0.0
@@ -108,7 +116,9 @@ class GroundingCheck(BaseCheck):
 
         all_phrases = [p for c in scenario.expected_claims for p in c.phrases]
         all_phrases += [p for c in scenario.false_claims for p in c.phrases]
-        ratio = unverified_ratio(text, all_phrases)
+        pattern = re.compile(self.ctx.config.checks.citation_pattern)
+        cites = find_citations(prep(text), pattern, self.ctx.documents)
+        ratio = unverified_ratio(text, all_phrases, cites)
         metrics: dict[str, float | int | bool | None] = {
             "unverified_content_ratio": ratio,
             **{k: v for k, v in sorted(verdicts.items())},

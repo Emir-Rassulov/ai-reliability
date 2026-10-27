@@ -1,7 +1,8 @@
 """Citation validation.
 
-Citations are extracted with `checks.citation_pattern` (default `[doc-ID]`, compared
-case-insensitively). Checks:
+Citations are extracted by `citation_parsing.find_citations`: the configured
+`checks.citation_pattern` (default `[doc-ID]`), explicitly labelled forms such as
+`[doc-ID: policy-2025]`, and known ids in parentheses; compared case-insensitively. Checks:
 * fabricated      - the cited id is not in the supplied document set -> FAIL.
 * not_retrieved   - the cited id exists but was not retrieved for this answer -> FAIL.
 * uncited_claim   - a sentence stating an expected claim cites nothing
@@ -20,6 +21,7 @@ from reliability.checks.base import BaseCheck
 from reliability.checks.text import match_phrases, prep, sentence_of, sentence_spans
 from reliability.models import CheckResult, ExpectedBehavior, Scenario, Status
 from reliability.providers.base import ProviderResponse
+from reliability.rag.citation_parsing import Citation, find_citations, strip_citations
 
 
 class CitationCheck(BaseCheck):
@@ -33,7 +35,8 @@ class CitationCheck(BaseCheck):
             return self.not_applicable(scenario, "refusals carry no citations")
         text = prep(response.text)
         pattern = re.compile(self.ctx.config.checks.citation_pattern)
-        cites = [(m.group("id").lower(), m.start()) for m in pattern.finditer(text)]
+        found_cites = find_citations(text, pattern, self.ctx.documents)
+        cites = [(c.doc_id, c.start) for c in found_cites]
         known = {d.lower() for d in self.ctx.documents}
         retrieved = {r.doc_id.lower() for r in scenario.retrieved}
         problems: list[dict[str, Any]] = []
@@ -63,7 +66,12 @@ class CitationCheck(BaseCheck):
             in_sentence = {d for d, off in cites if start <= off < end}
             if not in_sentence and index + 1 < len(spans):
                 n_start, n_end = spans[index + 1]
-                if not pattern.sub("", text[n_start:n_end]).strip(" .;,"):
+                inside = [
+                    Citation(c.doc_id, c.start - n_start, c.end - n_start)
+                    for c in found_cites
+                    if n_start <= c.start and c.end <= n_end
+                ]
+                if not strip_citations(text[n_start:n_end], inside).strip(" .;,"):
                     in_sentence = {d for d, off in cites if n_start <= off < n_end}
             support = {d.lower() for d in claim.supported_by}
             if not in_sentence:

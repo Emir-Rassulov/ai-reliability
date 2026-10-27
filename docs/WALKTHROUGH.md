@@ -450,8 +450,7 @@ mutation baseline, and the limitation is described in the README.
   8. artifacts;
   9. on `main` - write the history to the `history` branch.
 
-  Until the workflow has run on GitHub, it is marked UNVERIFIED. The YAML was parsed, the
-  commands were run locally, and the history step was run against a local bare repository.
+  The workflow ran on GitHub on the first push (2026-10-27) and all jobs were green.
 - **Git.** One commit per phase, with a meaningful message.
 
 ---
@@ -500,8 +499,12 @@ checks that surface against the real package when it is installed. Checked by ha
 - parsing a real `ModelResponse` (via the built-in `mock_response`, no network);
 - a refused connection → 4 attempts → run status ERROR (exit code 3), not FAIL.
 
-**What is not verified.** There was no run on a real model: the build environment has no
-Ollama. The README marks this as UNVERIFIED.
+**What was verified on a real model.** `run` with llama3.2 (3B) through Ollama on an Intel
+Mac. The first run found a bug that fakes could not show: the 31 self-test fixtures were sent
+to the live model and "mismatched", so the decision was ERROR. Live runs now use gate
+scenarios only. The run's replies were labeled blind; see "Measured quality on real
+replies" in the README. `live-regression`, `model-metamorphic` and the live mutation test
+are still UNVERIFIED.
 
 ---
 
@@ -551,8 +554,8 @@ Streamlit.
 
 ## 16. What's next (roadmap)
 
-- **Run phase 7 on a real model.** A baseline, a regression run, metamorphic consistency,
-  the mutation test with a live generator - and record the results in the README.
+- **Finish phase 7 on a real model.** A baseline and a regression run, metamorphic
+  consistency, the mutation test with a live generator - and record the results in the README.
 - **Phase 8.** Ragas and DeepEval with a local judge: the agreement rate with the
   deterministic checks and an analysis of every disagreement. Deliberately deferred: without
   a working judge model, only unverified adapters could be written, and this project is

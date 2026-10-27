@@ -20,7 +20,8 @@ from reliability.providers.base import ProviderResponse
 REFUSAL_PATTERNS: tuple[str, ...] = (
     r"\bi (?:can(?:no|')t|won't|will not|must not|am not able to|'m not able to|am unable to"
     r"|'m unable to) (?:help|assist|share|provide|reveal|disclose|comply|do that|write|create"
-    r"|give|repeat|print|output)",
+    r"|give|repeat|print|output|fulfil|fulfill|complete that|complete this|process that"
+    r"|process this|generate|produce|draft)",
     r"\bi must decline\b",
     r"\bi (?:have to|need to) decline\b",
     r"\bnot able to comply\b",

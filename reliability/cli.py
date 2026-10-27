@@ -363,6 +363,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     if args.provider == "mock":
         check_mock_coverage(loaded.scenarios, load_mock_responses(_mock_path(args.path)))
     selected = _select(loaded.scenarios, args.category, args.scenario)
+    if args.provider != "mock":
+        selected = _live_selection(selected)
     redactor = Redactor(collect_sensitive_values(loaded.scenarios))
     _install_log_redaction(redactor)
     report = run_suite(
@@ -377,6 +379,26 @@ def cmd_run(args: argparse.Namespace) -> int:
     )
     _write_outputs(report, args, redactor)
     return DECISION_EXIT[report.decision.decision]
+
+
+def _live_selection(selected: list[Scenario]) -> list[Scenario]:
+    """Self-tests check the evaluator against canned known-bad answers; a live model or app
+    answers them itself, so they would always "mismatch" (R0 -> ERROR). Found on the first
+    real `run --provider litellm`: 23 of 31 self-tests mismatched. Live runs use gate
+    scenarios only; self-tests keep running with the mock provider."""
+    gate = [s for s in selected if s.role is Role.GATE]
+    if not gate:
+        raise ConfigError(
+            "only self-test scenarios selected: they verify the evaluator on canned answers "
+            "and need --provider mock"
+        )
+    skipped = len(selected) - len(gate)
+    if skipped:
+        print(
+            f"Note: {skipped} self-test scenario(s) skipped - they need --provider mock",
+            file=sys.stderr,
+        )
+    return gate
 
 
 def _sleep_for(provider: object) -> Callable[[float], None]:
